@@ -534,6 +534,11 @@ with st.spinner("Scoring all combinations across 4 dimensions..."):
 filtered = all_combos[all_combos["velocity"] >= min_velocity].reset_index(drop=True)
 top_combos = filtered.head(top_n)
 
+# Build export CSV here so the sidebar download button has it ready
+_export_df  = top_combos[["city","group","subcat","price","color","color_hex","score_norm","velocity","geo_score","cat_score","price_score","color_score"]].copy()
+_export_df.columns = ["City","Group","Sub-Category","Price","Color","Color Hex","Trend Score","Velocity %","Geo Score","Cat Score","Price Score","Color Score"]
+_export_csv = _export_df.to_csv(index=False)
+
 total_combos = len(all_combos)
 above_75     = int((all_combos["score_norm"] >= 75).sum())
 avg_velocity = float(all_combos["velocity"].mean())
@@ -591,32 +596,35 @@ st.markdown(f'<div class="section-label">🏆 Top {top_n} Trending Combinations<
 RANK_LABELS  = ["#1 — HOTTEST","#2 — RISING FAST","#3 — STRONG SIGNAL","#4 — EMERGING","#5 — WATCH THIS"]
 RANK_COLORS  = ["#e8a020","#c0c0c0","#cd7f32","#3a8a6a","#5a4a8a"]
 
-for idx, row in top_combos.iterrows():
-    rank     = idx + 1
-    rk_cls   = f"rank-{rank}"
-    rk_color = RANK_COLORS[min(rank-1, 4)]
-    rk_label = RANK_LABELS[min(rank-1, len(RANK_LABELS)-1)]
+def render_bar(label, score_val, color_val):
+    """Render a labelled progress bar using only native Streamlit."""
+    st.caption(label)
+    st.progress(int(min(score_val, 100)), text=f"{int(score_val)}/100")
 
-    color_hex   = row["color_hex"]          # hex string already resolved in score_combination()
-    price_color = PRICE_BUCKETS.get(row["price"], {}).get("color","#888888")
+
+for idx, row in top_combos.iterrows():
+    rank        = idx + 1
+    rk_color    = RANK_COLORS[min(rank - 1, 4)]
+    rk_label    = RANK_LABELS[min(rank - 1, len(RANK_LABELS) - 1)]
+    color_hex   = row["color_hex"]
+    price_color = PRICE_BUCKETS.get(row["price"], {}).get("color", "#888888")
     vel         = int(row["velocity"])
     vel_sign    = "+" if vel >= 0 else ""
-    vel_cls     = "vel-up" if vel >= 0 else "vel-down"
     vel_arrow   = "▲" if vel >= 0 else "▼"
     score       = round(row["score_norm"], 1)
 
-    # Which cities rank this combo highest?
-    city_scores_for_combo = []
-    for c in selected_cities:
-        s = score_combination(c, row["subcat"], row["price"], row["color"])
-        city_scores_for_combo.append((c, s["composite"]))
-    city_scores_for_combo.sort(key=lambda x: -x[1])
+    # City ranking for this combo
+    city_scores_for_combo = sorted(
+        [(c, score_combination(c, row["subcat"], row["price"], row["color"])["composite"])
+         for c in selected_cities],
+        key=lambda x: -x[1]
+    )
     top3_cities  = [x[0] for x in city_scores_for_combo[:3]]
     other_cities = [x[0] for x in city_scores_for_combo[3:]]
 
     insight_text = get_insight(row, idx)
 
-    # Sparkline (mini plotly)
+    # Sparkline
     spark_vals = timeseries_for_combo(row["city"], row["subcat"], row["price"], row["color"])
     fig_spark  = go.Figure(go.Scatter(
         x=list(range(len(spark_vals))), y=spark_vals.tolist(),
@@ -626,94 +634,88 @@ for idx, row in top_combos.iterrows():
         hoverinfo="skip"
     ))
     fig_spark.update_layout(
-        height=80, margin=dict(l=0,r=0,t=0,b=0),
+        height=90, margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(visible=False), yaxis=dict(visible=False, range=[0,105]),
+        xaxis=dict(visible=False), yaxis=dict(visible=False, range=[0, 105]),
         showlegend=False
     )
 
-    # City chips
-    city_chips_html = "".join([
-        f'<span class="city-chip strong">{c}</span>' for c in top3_cities
-    ] + [
-        f'<span class="city-chip">{c}</span>' for c in other_cities
-    ])
+    # ── Card container ──────────────────────────────────────────────────────
+    with st.container(border=True):
 
-    # Dimension bar fills
-    def bar(score_val, color_val):
-        return f'<div class="dim-bar-fill" style="width:{min(score_val,100)}%;background:{color_val}"></div>'
+        # Row 1: rank label + title + score
+        h1, h2 = st.columns([4, 1])
+        with h1:
+            st.markdown(
+                f"**{rk_label}**  \n"
+                f"### {row['subcat']} · {row['color']}",
+            )
+        with h2:
+            st.metric(
+                label="Trend Score",
+                value=f"{score}",
+                delta=f"{vel_sign}{vel}% MoM",
+                delta_color="normal" if vel >= 0 else "inverse",
+            )
 
-    st.markdown(f"""
-    <div class="combo-card {rk_cls}">
-      <div class="rank-badge">{rank}</div>
-      <div class="combo-body">
+        # Row 2: dimension tags as columns
+        t1, t2, t3, t4 = st.columns(4)
+        t1.markdown(f"📍 **{row['city']}**")
+        t2.markdown(f"🏷️ **{row['group']}**")
+        t3.markdown(f"💰 **{row['price']}**")
+        # Color swatch using a tiny plotly figure (single filled square)
+        with t4:
+            fig_swatch = go.Figure(go.Bar(
+                x=[1], y=[1],
+                marker_color=color_hex,
+                width=[1],
+            ))
+            fig_swatch.update_layout(
+                height=36, margin=dict(l=0, r=0, t=0, b=0),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(visible=False), yaxis=dict(visible=False),
+                showlegend=False,
+                annotations=[dict(
+                    text=row["color"], x=0.5, y=0.5,
+                    xref="paper", yref="paper",
+                    showarrow=False,
+                    font=dict(color="white" if row["color"] not in ("White","Beige / Cream","Mint","Silver","Sky Blue","Yellow","Lavender") else "#333",
+                              size=10, family="DM Mono"),
+                )]
+            )
+            st.plotly_chart(fig_swatch, use_container_width=True,
+                            config={"displayModeBar": False})
 
-        <div class="combo-header">
-          <div>
-            <div class="combo-rank-num">{rk_label}</div>
-            <div class="combo-name">{row['subcat']} · {row['color']}</div>
-            <div class="combo-tags">
-              <span class="tag tag-geo">📍 {row['city']}</span>
-              <span class="tag tag-cat">🏷️ {row['group']}</span>
-              <span class="tag tag-price">💰 {row['price']}</span>
-              <span class="tag tag-color" style="border-color:{color_hex}60;background:{color_hex}10">
-                <span style="display:inline-block;width:8px;height:8px;background:{color_hex};vertical-align:middle;margin-right:4px;border-radius:1px"></span>{row['color']}
-              </span>
-            </div>
-          </div>
-          <div class="score-ring-wrap">
-            <div class="score-ring-val" style="color:{rk_color}">{score}</div>
-            <div class="score-ring-label">Trend Score</div>
-            <div class="velocity {vel_cls}">{vel_arrow} {vel_sign}{vel}% MoM</div>
-          </div>
-        </div>
+        st.divider()
 
-        <div class="dim-bars">
-          <div class="dim-bar-row">
-            <div class="dim-bar-label">📍 Geo Reach</div>
-            <div class="dim-bar-track">{bar(row['geo_score'],'#f97316')}</div>
-            <div class="dim-bar-val">{row['geo_score']}/100</div>
-          </div>
-          <div class="dim-bar-row">
-            <div class="dim-bar-label">🏷️ Category Fit</div>
-            <div class="dim-bar-track">{bar(row['cat_score'],'#38bdf8')}</div>
-            <div class="dim-bar-val">{row['cat_score']}/100</div>
-          </div>
-          <div class="dim-bar-row">
-            <div class="dim-bar-label">💰 Price Demand</div>
-            <div class="dim-bar-track">{bar(row['price_score'], price_color)}</div>
-            <div class="dim-bar-val">{row['price_score']}/100</div>
-          </div>
-          <div class="dim-bar-row">
-            <div class="dim-bar-label">🎨 Color Pull</div>
-            <div class="dim-bar-track">{bar(row['color_score'], color_hex)}</div>
-            <div class="dim-bar-val">{row['color_score']}/100</div>
-          </div>
-        </div>
+        # Row 3: dimension score bars
+        b1, b2, b3, b4 = st.columns(4)
+        with b1:
+            render_bar("📍 Geo Reach", row["geo_score"], "#f97316")
+        with b2:
+            render_bar("🏷️ Category Fit", row["cat_score"], "#38bdf8")
+        with b3:
+            render_bar("💰 Price Demand", row["price_score"], price_color)
+        with b4:
+            render_bar("🎨 Color Pull", row["color_score"], color_hex)
 
-        <div class="insight-line">"{insight_text}"</div>
+        # Row 4: sparkline + insight
+        sp1, sp2 = st.columns([2, 3])
+        with sp1:
+            st.plotly_chart(fig_spark, use_container_width=True,
+                            config={"displayModeBar": False})
+            peak    = int(spark_vals.max())
+            avg_7d  = int(spark_vals[-7:].mean())
+            st.caption(f"60-day trend · Peak **{peak}** · Last 7d avg **{avg_7d}**")
+        with sp2:
+            st.info(f"💡 {insight_text}")
+            st.caption(
+                "Strongest in: "
+                + "  ·  ".join([f"**{c}**" for c in top3_cities])
+                + ("  ·  " + "  ·  ".join(other_cities) if other_cities else "")
+            )
 
-        <div class="city-reach">
-          <span style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-right:4px;align-self:center">Strongest in →</span>
-          {city_chips_html}
-        </div>
-
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Spark + score breakdown side by side
-    sc1, sc2 = st.columns([3, 1])
-    with sc1:
-        st.plotly_chart(fig_spark, use_container_width=True, config={"displayModeBar": False})
-    with sc2:
-        st.markdown(f"""
-        <div style="background:var(--surface2);border:1px solid var(--border);padding:14px;height:80px;display:flex;flex-direction:column;justify-content:center;gap:4px">
-          <div style="font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)">60-day trend</div>
-          <div style="font-size:11px;color:var(--text)">Peak: <b>{int(timeseries_for_combo(row['city'],row['subcat'],row['price'],row['color']).max())}</b></div>
-          <div style="font-size:11px;color:var(--text)">Last 7d avg: <b>{int(timeseries_for_combo(row['city'],row['subcat'],row['price'],row['color'])[-7:].mean())}</b></div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.divider()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -798,14 +800,19 @@ with tab4:
     st.plotly_chart(fig_col, use_container_width=True)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  EXPORT
-# ══════════════════════════════════════════════════════════════════════════════
-with st.expander("📋 Export top combinations"):
-    export_df = top_combos[["city","group","subcat","price","color","color_hex","score_norm","velocity","geo_score","cat_score","price_score","color_score"]].copy()
-    export_df.columns = ["City","Group","Sub-Category","Price","Color","Color Hex","Trend Score","Velocity %","Geo Score","Cat Score","Price Score","Color Score"]
-    st.dataframe(export_df.set_index("City"), use_container_width=True)
-    st.download_button("⬇️ Download CSV", export_df.to_csv(index=False), "top_combinations.csv","text/csv")
+# ── Sidebar download button (rendered after compute so CSV is ready) ──────────
+with st.sidebar:
+    st.markdown("---")
+    st.markdown('<div class="sidebar-section">⬇️ Export</div>', unsafe_allow_html=True)
+    st.download_button(
+        label="Download Top Combinations CSV",
+        data=_export_csv,
+        file_name="top_combinations.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════

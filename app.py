@@ -2,11 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from pytrends.request import TrendReq
 import numpy as np
-import time
-import requests
 from datetime import datetime, timedelta
 import itertools
 
@@ -14,1033 +10,797 @@ import itertools
 #  PAGE CONFIG
 # ══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="India Fashion Intelligence",
-    page_icon="🧵",
+    page_title="India Fashion — Trend Combinations",
+    page_icon="🔥",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  DESIGN SYSTEM
+#  DESIGN — Dark editorial, almost-black with amber & ivory accents
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700;900&family=Fraunces:ital,wght@0,300;0,400;0,600;1,400&family=DM+Mono:wght@300;400;500&display=swap');
 
 :root {
-  --bg:       #0a0a0f;
-  --surface:  #12121a;
-  --surface2: #1a1a26;
-  --border:   #2a2a3a;
-  --text:     #e8e4dc;
-  --muted:    #6b6878;
-  --accent1:  #ff6b35;   /* geo — orange */
-  --accent2:  #7c3aed;   /* category — violet */
-  --accent3:  #10b981;   /* price — emerald */
-  --accent4:  #f59e0b;   /* color — amber */
-  --hot:      #ef4444;
-  --rise:     #f97316;
+  --bg:       #0d0d0d;
+  --surface:  #141414;
+  --surface2: #1c1c1c;
+  --border:   #2a2a2a;
+  --text:     #f0ead8;
+  --muted:    #5a5a5a;
+  --amber:    #e8a020;
+  --ivory:    #f0ead8;
+  --crimson:  #c23b2a;
+  --teal:     #1e8a6e;
+  --violet:   #6b3fa0;
+
+  --rank1: #e8a020;
+  --rank2: #c0c0c0;
+  --rank3: #cd7f32;
+  --rank4: #3a8a6a;
+  --rank5: #5a4a8a;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+
 html, body, [class*="css"] {
-  font-family: 'IBM Plex Sans', sans-serif;
+  font-family: 'DM Mono', monospace !important;
   background: var(--bg) !important;
   color: var(--text) !important;
 }
 
-/* ── header ── */
-.dash-header {
-  background: linear-gradient(135deg, #0a0a0f 0%, #12101f 100%);
+/* ── HEADER ─────────────────────────────────────── */
+.page-header {
+  padding: 36px 0 28px;
   border-bottom: 1px solid var(--border);
-  padding: 28px 0 20px;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
+  position: relative;
 }
-.dash-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 36px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  background: linear-gradient(90deg, #ff6b35, #f59e0b, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1.1;
+.page-label {
+  font-size: 9px; letter-spacing: 0.32em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px;
 }
-.dash-sub {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  color: var(--muted);
-  text-transform: uppercase;
-  margin-top: 6px;
+.page-title {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 38px; font-weight: 900;
+  letter-spacing: -0.04em; line-height: 1;
+  color: var(--ivory);
+}
+.page-title em { color: var(--amber); font-style: normal; }
+.page-subtitle {
+  font-family: 'Fraunces', serif;
+  font-size: 16px; font-weight: 300; font-style: italic;
+  color: var(--muted); margin-top: 10px;
+}
+.live-dot {
+  display: inline-block; width: 7px; height: 7px;
+  background: var(--teal); border-radius: 50%;
+  margin-right: 6px; animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
 }
 
-/* ── dimension pills ── */
-.dim-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 14px; border-radius: 2px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px; font-weight: 500;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  margin-right: 8px; margin-bottom: 6px;
-}
-.dim-geo      { background: #ff6b3520; color: #ff6b35; border: 1px solid #ff6b3540; }
-.dim-category { background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; }
-.dim-price    { background: #10b98120; color: #34d399; border: 1px solid #10b98140; }
-.dim-color    { background: #f59e0b20; color: #fbbf24; border: 1px solid #f59e0b40; }
-
-/* ── KPI cards ── */
-.kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
-.kpi-card {
+/* ── COMBO CARDS ─────────────────────────────────── */
+.combo-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  padding: 20px 22px;
-  position: relative; overflow: hidden;
-  transition: border-color 0.2s;
+  border-left: 4px solid;
+  padding: 0;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
-.kpi-card::before {
-  content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 2px;
-}
-.kpi-card.geo::before      { background: var(--accent1); }
-.kpi-card.category::before { background: var(--accent2); }
-.kpi-card.price::before    { background: var(--accent3); }
-.kpi-card.color-dim::before{ background: var(--accent4); }
-.kpi-card:hover { border-color: #3a3a5a; }
+.combo-card:hover { box-shadow: 0 4px 32px rgba(0,0,0,.6); }
 
-.kpi-dim-label {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px; letter-spacing: 0.2em;
+.combo-card.rank-1 { border-left-color: var(--rank1); }
+.combo-card.rank-2 { border-left-color: var(--rank2); }
+.combo-card.rank-3 { border-left-color: var(--rank3); }
+.combo-card.rank-4 { border-left-color: var(--rank4); }
+.combo-card.rank-5 { border-left-color: var(--rank5); }
+
+/* Rank badge */
+.rank-badge {
+  position: absolute; top: 0; right: 0;
+  font-family: 'Unbounded', sans-serif;
+  font-size: 56px; font-weight: 900;
+  line-height: 1; padding: 8px 18px;
+  opacity: 0.06; letter-spacing: -0.04em;
+  pointer-events: none; user-select: none;
+}
+.rank-1 .rank-badge { color: var(--rank1); }
+.rank-2 .rank-badge { color: var(--rank2); }
+.rank-3 .rank-badge { color: var(--rank3); }
+.rank-4 .rank-badge { color: var(--rank4); }
+.rank-5 .rank-badge { color: var(--rank5); }
+
+.combo-body { padding: 24px 28px; }
+
+/* Combo header row */
+.combo-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 20px;
+  margin-bottom: 18px;
+}
+.combo-rank-num {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.rank-1 .combo-rank-num { color: var(--rank1); }
+.rank-2 .combo-rank-num { color: var(--rank2); }
+.rank-3 .combo-rank-num { color: var(--rank3); }
+.rank-4 .combo-rank-num { color: var(--rank4); }
+.rank-5 .combo-rank-num { color: var(--rank5); }
+
+.combo-name {
+  font-family: 'Fraunces', serif;
+  font-size: 22px; font-weight: 600;
+  line-height: 1.2; color: var(--ivory);
+  margin: 4px 0 6px;
+}
+.combo-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  font-size: 9px; letter-spacing: 0.16em;
+  text-transform: uppercase; padding: 3px 9px;
+  border: 1px solid; border-radius: 1px;
+}
+.tag-geo   { color: #f97316; border-color: #f9731640; background: #f973160a; }
+.tag-cat   { color: #38bdf8; border-color: #38bdf840; background: #38bdf80a; }
+.tag-price { color: #4ade80; border-color: #4ade8040; background: #4ade800a; }
+.tag-color { color: #e879f9; border-color: #e879f940; background: #e879f90a; }
+
+/* Score ring */
+.score-ring-wrap {
+  display: flex; flex-direction: column;
+  align-items: center; flex-shrink: 0;
+  gap: 4px;
+}
+.score-ring-val {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 28px; font-weight: 700;
+  line-height: 1;
+}
+.score-ring-label {
+  font-size: 8px; letter-spacing: 0.2em;
   text-transform: uppercase; color: var(--muted);
-  margin-bottom: 10px;
 }
-.kpi-value {
-  font-family: 'Syne', sans-serif;
-  font-size: 34px; font-weight: 700;
-  line-height: 1; color: var(--text);
-  margin-bottom: 4px;
+.velocity {
+  font-size: 11px; display: flex;
+  align-items: center; gap: 4px;
 }
-.kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-.kpi-badge {
-  display: inline-block;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px; padding: 2px 8px; border-radius: 2px;
-}
-.badge-hot  { background: #ef444420; color: #f87171; border:1px solid #ef444440; }
-.badge-rise { background: #f9731620; color: #fb923c; border:1px solid #f9731640; }
-.badge-cool { background: #10b98120; color: #34d399; border:1px solid #10b98140; }
+.vel-up   { color: #4ade80; }
+.vel-down { color: #f87171; }
 
-/* ── section headers ── */
-.section-header {
-  display: flex; align-items: center; gap: 12px;
-  margin: 28px 0 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.section-icon {
-  width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 4px; font-size: 14px;
-}
-.section-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 17px; font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.section-meta {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px; color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.12em;
-  margin-left: auto;
-}
+/* Dimension bars */
+.dim-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+.dim-bar-row { display: flex; flex-direction: column; gap: 4px; }
+.dim-bar-label { font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.dim-bar-track { height: 4px; background: var(--border); border-radius: 0; overflow: hidden; }
+.dim-bar-fill  { height: 100%; border-radius: 0; transition: width 0.8s ease; }
+.dim-bar-val   { font-size: 10px; color: var(--text); }
 
-/* ── insight cards ── */
-.insight-row {
-  display: flex; gap: 10px; align-items: flex-start;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid;
-  padding: 14px 16px; margin-bottom: 8px;
-  font-size: 13px; line-height: 1.5;
+/* City reach */
+.city-reach {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
-.insight-row.geo      { border-left-color: var(--accent1); }
-.insight-row.category { border-left-color: var(--accent2); }
-.insight-row.price    { border-left-color: var(--accent3); }
-.insight-row.color-d  { border-left-color: var(--accent4); }
-.insight-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-.insight-time {
-  margin-left: auto; flex-shrink: 0;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px; color: var(--muted);
+.city-chip {
+  font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; padding: 3px 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--muted);
+}
+.city-chip.strong { color: var(--text); border-color: #3a3a3a; background: #222; }
+
+/* Insight line */
+.insight-line {
+  font-family: 'Fraunces', serif;
+  font-size: 13px; font-style: italic;
+  color: var(--muted); margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-left: 2px solid var(--border);
+  line-height: 1.55;
 }
 
-/* ── tables ── */
-.stDataFrame { border: 1px solid var(--border) !important; }
+/* ── SUPPORTING CHARTS ───────────────────────────── */
+.section-rule {
+  border: none; border-top: 1px solid var(--border);
+  margin: 32px 0 24px;
+}
+.section-label {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--amber); margin-bottom: 16px;
+}
 
-/* ── sidebar ── */
+/* ── SIDEBAR ─────────────────────────────────────── */
 section[data-testid="stSidebar"] > div {
   background: var(--surface) !important;
   border-right: 1px solid var(--border);
 }
-.sidebar-dim-header {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px; letter-spacing: 0.2em;
-  text-transform: uppercase; padding: 10px 0 6px;
-  margin-top: 16px;
-}
-.sidebar-dim-header.geo      { color: var(--accent1); }
-.sidebar-dim-header.category { color: #a78bfa; }
-.sidebar-dim-header.price    { color: var(--accent3); }
-.sidebar-dim-header.color-d  { color: var(--accent4); }
-
 div[data-testid="stSelectbox"] label,
 div[data-testid="stMultiSelect"] label,
+div[data-testid="stCheckbox"] label,
 div[data-testid="stSlider"] label {
-  font-family: 'IBM Plex Mono', monospace !important;
-  font-size: 10px !important; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--muted) !important;
+  font-family: 'DM Mono', monospace !important;
+  font-size: 9px !important;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--muted) !important;
+}
+.sidebar-section {
+  font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--amber); padding: 14px 0 6px;
+  border-bottom: 1px solid var(--border); margin-bottom: 10px;
 }
 
-.stSelectbox > div > div,
-.stMultiSelect > div > div {
-  background: var(--surface2) !important;
-  border-color: var(--border) !important;
-  color: var(--text) !important;
-}
-
-footer { visibility: hidden; }
+footer, .stDeployButton { display: none !important; }
+.block-container { padding-top: 0.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  FRAMEWORK DATA — Geography × Category × Price × Color
+#  MASTER DATA DEFINITIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── GEOGRAPHY ─────────────────────────────────────────────────────────────────
-GEO_ZONES = {
-    "North India":  ["Delhi", "Uttar Pradesh", "Punjab", "Haryana", "Rajasthan", "Himachal Pradesh", "Uttarakhand", "Jammu and Kashmir"],
-    "South India":  ["Tamil Nadu", "Kerala", "Karnataka", "Andhra Pradesh", "Telangana"],
-    "West India":   ["Maharashtra", "Gujarat", "Goa"],
-    "East India":   ["West Bengal", "Bihar", "Odisha", "Jharkhand", "Assam"],
-    "Central India":["Madhya Pradesh", "Chhattisgarh"],
+TOP10_CITIES = {
+    "Mumbai":    {"rank":1,  "market_bn":42.0, "region":"West",  "tier":"Metro"},
+    "Delhi":     {"rank":2,  "market_bn":38.5, "region":"North", "tier":"Metro"},
+    "Bengaluru": {"rank":3,  "market_bn":29.0, "region":"South", "tier":"Metro"},
+    "Hyderabad": {"rank":4,  "market_bn":22.0, "region":"South", "tier":"Metro"},
+    "Chennai":   {"rank":5,  "market_bn":19.5, "region":"South", "tier":"Metro"},
+    "Kolkata":   {"rank":6,  "market_bn":17.0, "region":"East",  "tier":"Metro"},
+    "Pune":      {"rank":7,  "market_bn":14.5, "region":"West",  "tier":"Tier-1"},
+    "Ahmedabad": {"rank":8,  "market_bn":13.0, "region":"West",  "tier":"Tier-1"},
+    "Jaipur":    {"rank":9,  "market_bn":10.5, "region":"North", "tier":"Tier-1"},
+    "Surat":     {"rank":10, "market_bn":9.5,  "region":"West",  "tier":"Tier-1"},
 }
-ALL_STATES = [s for states in GEO_ZONES.values() for s in states]
 
-# ── CATEGORY ──────────────────────────────────────────────────────────────────
+# Granular sub-categories (group → sub → keywords)
 CATEGORIES = {
-    "Ethnic Wear":     ["saree", "kurta", "lehenga", "salwar kameez", "sherwani", "dhoti"],
-    "Western Wear":    ["jeans", "blazer", "crop top", "co-ord set", "mini dress", "trench coat"],
-    "Fusion Wear":     ["ethnic fusion", "indo western", "sharara top", "kurti jeans", "jacket kurta"],
-    "Streetwear":      ["streetwear India", "oversized hoodie", "cargo pants", "sneakers India", "cap style"],
-    "Occasion Wear":   ["wedding outfit India", "party wear", "Diwali dress", "festive wear", "reception outfit"],
-    "Sustainable":     ["sustainable fashion India", "handloom saree", "khadi fashion", "upcycled clothing", "organic cotton"],
+    "Sarees":           {"Silk Saree":"Kanjeevaram silk saree","Cotton Saree":"handloom cotton saree","Chiffon Saree":"chiffon georgette saree","Designer Saree":"embroidered party saree","Casual Saree":"daily wear synthetic saree"},
+    "Kurtas & Suits":   {"A-Line Kurta":"straight A line kurta women","Anarkali Kurta":"Anarkali flared kurta","Printed Kurta":"block print ethnic kurta","Embroidered Kurta":"mirror work embroidered kurta","Palazzo Set":"kurta palazzo ethnic set","Salwar Kameez":"Punjabi salwar suit","Sharara Set":"sharara gharara set"},
+    "Lehengas":         {"Bridal Lehenga":"bridal wedding lehenga","Party Lehenga":"festive party lehenga","Casual Lehenga":"cotton casual lehenga","Navratri Chaniya Choli":"garba chaniya choli Navratri"},
+    "Dupattas":         {"Embroidered Dupatta":"phulkari embroidered dupatta","Printed Dupatta":"block print tie dye dupatta","Silk Dupatta":"banarasi organza dupatta"},
+    "Men's Ethnic":     {"Kurta Pyjama":"men ethnic kurta set","Sherwani":"wedding designer sherwani","Bandhgala":  "jodhpuri bandhgala suit","Nehru Jacket":"Modi Nehru waistcoat jacket","Dhoti Kurta":"traditional dhoti kurta men"},
+    "Women's Tops":     {"Crop Top":"crop top ethnic bralette","Shirt / Blouse":"formal cotton women shirt","Puff Sleeve Top":"balloon puff sleeve trendy top","Tank Top":"sleeveless cami tank top"},
+    "Women's Bottoms":  {"High-waist Jeans":"mom skinny high waist jeans women","Trousers":"wide leg formal trousers women","Skirt":"midi mini pleated skirt India","Shorts":"denim cycling shorts women"},
+    "Dresses":          {"Maxi Dress":"boho floral maxi dress","Midi Dress":"wrap slip midi dress","Mini Dress":"bodycon party mini dress","Co-ord Set":"matching two piece co-ord set"},
+    "Men's Casuals":    {"Oversized T-Shirt":"graphic drop shoulder oversized tshirt","Men's Jeans":"slim baggy straight jeans men","Cargo Pants":"utility cargo trousers men","Sweatshirt":"crewneck printed sweatshirt men","Hoodie":"zip oversized hoodie men","Blazer":"unstructured casual blazer men"},
+    "Fusion Wear":      {"Kurti with Jeans":"kurti jeans ethnic combo","Jacket Kurta":"long jacket waistcoat kurta","Dhoti Pants":"harem dhoti style pants women","Cape Kurti":"drape cape kurta"},
+    "Streetwear":       {"Bomber Jacket":"varsity satin bomber jacket","Joggers":"streetwear track jogger pants","Sneakers Style":"chunky white sneakers outfit","Bucket Hat":"streetwear cap bucket hat India"},
+    "Activewear":       {"Yoga Wear":"yoga leggings set women India","Sports Bra":"padded zip sports bra India","Running Gear":"running tights gym wear women","Cycling Wear":"cycling jersey shorts India"},
+    "Accessories":      {"Jhumkas":"oxidised gold jhumka earrings","Maang Tikka":"bridal matha patti tikka","Potli Bag":"embroidered ethnic potli clutch","Sunglasses":"cat eye aviator sunglasses India"},
+    "Footwear":         {"Kolhapuri":"ethnic handmade kolhapuri chappal","Mojari / Juttis":"mojari juttis ethnic footwear","Heels":"block stiletto platform heels India","Sneakers":"casual white sneakers India","Flats":"ballet loafers flats women India"},
+    "Sustainable":      {"Handloom":"handloom fabric saree kurta India","Khadi":"khadi kurta fabric fashion","Organic Cotton":"organic natural dye GOTS cotton India","Upcycled":"upcycled sustainable eco fashion India"},
 }
 
-# ── PRICE SEGMENTS ────────────────────────────────────────────────────────────
-PRICE_SEGMENTS = {
-    "Budget (< ₹500)":       {"suffix": "under 500",  "color": "#10b981", "range": "₹0–500"},
-    "Mid (₹500–₹2000)":      {"suffix": "500 to 2000","color": "#3b82f6", "range": "₹500–2000"},
-    "Premium (₹2000–₹8000)": {"suffix": "2000 price", "color": "#8b5cf6", "range": "₹2000–8000"},
-    "Luxury (₹8000+)":        {"suffix": "designer",   "color": "#f59e0b", "range": "₹8000+"},
+SUBCAT_TO_GROUP = {sub: grp for grp, subs in CATEGORIES.items() for sub in subs}
+ALL_SUBCATS     = [s for subs in CATEGORIES.values() for s in subs]
+
+PRICE_BUCKETS = {
+    "₹0–1K":   {"range":(0,1000),   "color":"#22c55e", "mid":500},
+    "₹1–2K":   {"range":(1001,2000),"color":"#84cc16", "mid":1500},
+    "₹2–3K":   {"range":(2001,3000),"color":"#eab308", "mid":2500},
+    "₹3–4K":   {"range":(3001,4000),"color":"#f97316", "mid":3500},
+    "₹4–5K":   {"range":(4001,5000),"color":"#ef4444", "mid":4500},
+    "₹5K+":    {"range":(5001,99999),"color":"#a855f7","mid":7500},
 }
 
-# ── COLOR PALETTE TRENDS ──────────────────────────────────────────────────────
-COLOR_TRENDS = {
-    "Earth Tones":   {"keywords": ["earthy tones fashion", "terracotta outfit", "rust color dress", "beige kurta"], "hex": ["#c4793a","#8b4513","#d4956b","#e8c4a0"]},
-    "Pastels":        {"keywords": ["pastel outfit India", "pastel saree", "soft pink kurta", "mint green dress"], "hex": ["#ffb3c6","#b5ead7","#c7ceea","#ffdac1"]},
-    "Bold Brights":   {"keywords": ["bright color outfit", "neon fashion India", "electric blue dress", "hot pink saree"], "hex": ["#ff006e","#3a86ff","#ffbe0b","#fb5607"]},
-    "Monochromes":    {"keywords": ["all white outfit India", "all black ethnic", "monochrome look", "tonal dressing"], "hex": ["#ffffff","#888888","#333333","#111111"]},
-    "Jewel Tones":    {"keywords": ["emerald green saree", "royal blue lehenga", "ruby red outfit", "sapphire kurta"],  "hex": ["#046307","#003087","#9b1313","#1a237e"]},
-    "Metallics":      {"keywords": ["gold outfit India", "silver lehenga", "metallic saree", "bronze dress"],           "hex": ["#ffd700","#c0c0c0","#cd7f32","#b8860b"]},
+ALL_COLORS = {
+    "Red":            {"hex":"#e63946","family":"Reds & Pinks"},
+    "Pink":           {"hex":"#ff85a1","family":"Reds & Pinks"},
+    "Magenta":        {"hex":"#ff00aa","family":"Reds & Pinks"},
+    "Maroon":         {"hex":"#800000","family":"Reds & Pinks"},
+    "Coral":          {"hex":"#ff6b6b","family":"Reds & Pinks"},
+    "Orange":         {"hex":"#ff7f00","family":"Oranges & Yellows"},
+    "Mustard":        {"hex":"#e3a008","family":"Oranges & Yellows"},
+    "Yellow":         {"hex":"#ffd700","family":"Oranges & Yellows"},
+    "Green":          {"hex":"#2d6a4f","family":"Greens"},
+    "Olive":          {"hex":"#808000","family":"Greens"},
+    "Mint":           {"hex":"#98ff98","family":"Greens"},
+    "Teal":           {"hex":"#008080","family":"Greens"},
+    "Navy Blue":      {"hex":"#001f5b","family":"Blues"},
+    "Royal Blue":     {"hex":"#4169e1","family":"Blues"},
+    "Sky Blue":       {"hex":"#87ceeb","family":"Blues"},
+    "Cobalt":         {"hex":"#0047ab","family":"Blues"},
+    "Purple":         {"hex":"#6a0dad","family":"Purples"},
+    "Lavender":       {"hex":"#b57bee","family":"Purples"},
+    "Wine":           {"hex":"#722f37","family":"Purples"},
+    "White":          {"hex":"#f5f5f5","family":"Neutrals"},
+    "Black":          {"hex":"#1a1a1a","family":"Neutrals"},
+    "Beige / Cream":  {"hex":"#e8dcc8","family":"Neutrals"},
+    "Grey":           {"hex":"#808080","family":"Neutrals"},
+    "Terracotta":     {"hex":"#c27c5a","family":"Earth Tones"},
+    "Camel / Tan":    {"hex":"#c19a6b","family":"Earth Tones"},
+    "Gold / Bronze":  {"hex":"#cfb53b","family":"Metallics"},
+    "Silver":         {"hex":"#c0c0c0","family":"Metallics"},
 }
 
 TIMEFRAME_OPTIONS = {
-    "Last 7 days":    "now 7-d",
-    "Last 30 days":   "today 1-m",
-    "Last 3 months":  "today 3-m",
-    "Last 12 months": "today 12-m",
+    "Last 7 days":   "now 7-d",
+    "Last 30 days":  "today 1-m",
+    "Last 3 months": "today 3-m",
+    "Last 12 months":"today 12-m",
 }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SYNTHETIC DATA ENGINE  (mirrors real pytrends structure)
+#  CITY-LEVEL BIAS PROFILES
 # ══════════════════════════════════════════════════════════════════════════════
-def synthetic_region(keywords):
-    rng = np.random.default_rng(sum(ord(c) for c in ''.join(keywords)))
-    data = {"state": ALL_STATES}
-    for kw in keywords:
-        seed = sum(ord(c) for c in kw)
-        base = rng.integers(20, 80)
-        vals = np.clip(base + rng.normal(0, 18, len(ALL_STATES)), 5, 100).astype(int)
-        data[kw] = vals
-    return pd.DataFrame(data)
+CITY_PROFILES = {
+    "Mumbai":    {"western":1.45,"ethnic":0.85,"luxury":1.55,"budget":0.70,"streetwear":1.35,"colors":{"Black":1.4,"White":1.3,"Red":1.3,"Gold / Bronze":1.2,"Coral":1.2}},
+    "Delhi":     {"western":1.15,"ethnic":1.20,"luxury":1.45,"budget":0.80,"streetwear":1.10,"colors":{"Maroon":1.4,"Royal Blue":1.3,"Gold / Bronze":1.3,"Navy Blue":1.2,"Wine":1.2}},
+    "Bengaluru": {"western":1.55,"ethnic":0.80,"luxury":1.25,"budget":0.85,"streetwear":1.50,"colors":{"Green":1.4,"Teal":1.3,"Mint":1.3,"Olive":1.2,"Grey":1.2}},
+    "Hyderabad": {"western":1.10,"ethnic":1.25,"luxury":1.10,"budget":0.90,"streetwear":0.95,"colors":{"Teal":1.4,"Mustard":1.3,"Maroon":1.3,"Gold / Bronze":1.2,"Purple":1.2}},
+    "Chennai":   {"western":0.90,"ethnic":1.40,"luxury":1.00,"budget":1.00,"streetwear":0.80,"colors":{"Magenta":1.4,"Purple":1.3,"Navy Blue":1.3,"Pink":1.2,"Royal Blue":1.2}},
+    "Kolkata":   {"western":1.00,"ethnic":1.30,"luxury":0.90,"budget":1.05,"streetwear":0.90,"colors":{"White":1.4,"Red":1.3,"Pink":1.3,"Gold / Bronze":1.1,"Yellow":1.2}},
+    "Pune":      {"western":1.30,"ethnic":0.90,"luxury":1.00,"budget":0.95,"streetwear":1.20,"colors":{"Olive":1.3,"Terracotta":1.3,"Beige / Cream":1.3,"Grey":1.2,"Mint":1.2}},
+    "Ahmedabad": {"western":0.80,"ethnic":1.50,"luxury":0.90,"budget":1.10,"streetwear":0.70,"colors":{"Mustard":1.4,"Orange":1.4,"Red":1.2,"Pink":1.2,"Yellow":1.2}},
+    "Jaipur":    {"western":0.65,"ethnic":1.65,"luxury":0.80,"budget":1.20,"streetwear":0.60,"colors":{"Pink":1.5,"Yellow":1.4,"Orange":1.3,"Magenta":1.4,"Red":1.2}},
+    "Surat":     {"western":0.75,"ethnic":1.45,"luxury":1.15,"budget":1.00,"streetwear":0.65,"colors":{"Gold / Bronze":1.5,"Silver":1.4,"Coral":1.3,"Pink":1.2,"Mustard":1.2}},
+}
 
-def synthetic_timeseries(keywords, n=90):
-    rng = np.random.default_rng(42)
-    dates = pd.date_range(end=datetime.today(), periods=n, freq='D')
-    data = {}
-    for kw in keywords:
-        seed = sum(ord(c) for c in kw) % 100
-        base  = rng.integers(25, 65)
-        trend = np.linspace(0, rng.integers(-15, 30), n)
-        wave  = 10 * np.sin(np.linspace(0, 4*np.pi, n) + seed)
-        noise = rng.normal(0, 7, n)
-        data[kw] = np.clip(base + trend + wave + noise, 0, 100).astype(int)
-    return pd.DataFrame(data, index=dates)
+WESTERN_GROUPS  = {"Women's Tops","Women's Bottoms","Dresses","Men's Casuals","Streetwear","Activewear","Fusion Wear"}
+ETHNIC_GROUPS   = {"Sarees","Kurtas & Suits","Lehengas","Dupattas","Men's Ethnic","Accessories","Footwear"}
+LUXURY_GROUPS   = {"Lehengas","Men's Ethnic","Sarees"}
+BUDGET_GROUPS   = {"Activewear","Men's Casuals","Women's Tops","Women's Bottoms"}
+STREET_GROUPS   = {"Streetwear","Fusion Wear","Men's Casuals"}
+LUXURY_PRICES   = {"₹3–4K","₹4–5K","₹5K+"}
+BUDGET_PRICES   = {"₹0–1K","₹1–2K"}
 
-def synthetic_price_region(categories_kws, price_segments):
-    """Simulate how price sensitivity varies by state for each category."""
-    rng = np.random.default_rng(99)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  SCORING ENGINE
+# ══════════════════════════════════════════════════════════════════════════════
+def rng_for(*keys): return np.random.default_rng(abs(hash("".join(str(k) for k in keys))) % (2**31))
+
+def score_combination(city: str, subcat: str, price: str, color: str) -> dict:
+    """
+    Score a 4-way combination on four independent signals,
+    then compute a weighted composite + a momentum (velocity) score.
+    """
+    group = SUBCAT_TO_GROUP.get(subcat, "")
+    prof  = CITY_PROFILES.get(city, {})
+    r     = rng_for(city, subcat, price, color)
+
+    # ── Base city-category affinity ──
+    base = r.integers(30, 72)
+    if group in WESTERN_GROUPS: base = int(base * prof.get("western", 1.0))
+    if group in ETHNIC_GROUPS:  base = int(base * prof.get("ethnic",  1.0))
+    if group in STREET_GROUPS:  base = int(base * prof.get("streetwear",1.0))
+    cat_score = int(np.clip(base + r.normal(0, 6), 5, 100))
+
+    # ── Price affinity ──
+    price_base = r.integers(25, 70)
+    if price in LUXURY_PRICES  and group in LUXURY_GROUPS: price_base = int(price_base * prof.get("luxury",1.0))
+    if price in BUDGET_PRICES  and group in BUDGET_GROUPS: price_base = int(price_base * prof.get("budget",1.0))
+    price_score = int(np.clip(price_base + r.normal(0, 6), 5, 100))
+
+    # ── Color affinity ──
+    color_base = r.integers(20, 72)
+    city_color_mult = prof.get("colors", {}).get(color, 1.0)
+    color_score = int(np.clip(color_base * city_color_mult + r.normal(0, 6), 5, 100))
+
+    # ── Geo market weight (larger city = more absolute reach) ──
+    market_weight = TOP10_CITIES[city]["market_bn"] / 42.0   # normalize to Mumbai=1.0
+    geo_score     = int(np.clip(70 * market_weight + r.normal(0,8), 10, 100))
+
+    # ── Weighted composite (geo:20, cat:35, price:25, color:20) ──
+    composite = (0.20 * geo_score + 0.35 * cat_score + 0.25 * price_score + 0.20 * color_score)
+    composite = int(np.clip(composite + r.normal(0, 3), 5, 100))
+
+    # ── Momentum / velocity (how fast it is growing vs 4 weeks ago) ──
+    # Simulated as a % change; positive = accelerating
+    r2 = rng_for(city, subcat, price, color, "velocity")
+    velocity = int(np.clip(r2.normal(8, 22), -35, 65))   # −35% to +65%
+
+    return {
+        "city": city, "subcat": subcat, "group": group,
+        "price": price, "color": color,
+        "geo_score":   geo_score,
+        "cat_score":   cat_score,
+        "price_score": price_score,
+        "color_score": color_score,
+        "composite":   composite,
+        "velocity":    velocity,
+    }
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def compute_all_combinations(cities, subcats, prices, colors):
+    """Score every combination and return sorted DataFrame."""
     rows = []
-    price_labels = list(price_segments.keys())
-    for state in ALL_STATES:
-        for cat, kws in categories_kws.items():
-            for price in price_labels:
-                # Budget higher in Tier-2 states, luxury higher in metros
-                budget_bias = 1.4 if state in ["Uttar Pradesh","Bihar","Odisha","Assam","Chhattisgarh"] else 1.0
-                luxury_bias = 1.5 if state in ["Delhi","Maharashtra","Karnataka","Tamil Nadu","Gujarat"] else 0.7
-                price_mult = {"Budget (< ₹500)": budget_bias,
-                              "Mid (₹500–₹2000)": 1.0,
-                              "Premium (₹2000–₹8000)": 1.1,
-                              "Luxury (₹8000+)": luxury_bias}[price]
-                score = int(np.clip(rng.integers(15,75) * price_mult, 0, 100))
-                rows.append({"state": state, "category": cat, "price_segment": price, "score": score})
-    return pd.DataFrame(rows)
+    for combo in itertools.product(cities, subcats, prices, colors):
+        rows.append(score_combination(*combo))
+    df = pd.DataFrame(rows)
+    # Normalize composite to 0-100 across the full search space
+    mn, mx = df["composite"].min(), df["composite"].max()
+    df["score_norm"] = ((df["composite"] - mn) / (mx - mn) * 100).round(1)
+    return df.sort_values("score_norm", ascending=False).reset_index(drop=True)
 
-def synthetic_color_region(color_trends):
-    """Simulate color preference by state."""
-    rng = np.random.default_rng(7)
-    rows = []
-    for state in ALL_STATES:
-        for palette, info in color_trends.items():
-            score = int(np.clip(rng.integers(10,90), 0, 100))
-            rows.append({"state": state, "palette": palette, "score": score})
-    return pd.DataFrame(rows)
+
+def timeseries_for_combo(city, subcat, price, color, n=60):
+    """Generate a trend sparkline for a specific combination."""
+    r     = rng_for(city, subcat, price, color, "ts")
+    base  = r.integers(35, 68)
+    trend = np.linspace(-10, 25, n)
+    wave  = 8 * np.sin(np.linspace(0, 3*np.pi, n))
+    noise = r.normal(0, 6, n)
+    return np.clip(base + trend + wave + noise, 0, 100).astype(int)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  PYTRENDS FETCHERS
+#  INSIGHT GENERATOR
 # ══════════════════════════════════════════════════════════════════════════════
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_region(keywords, timeframe):
-    pt = TrendReq(hl='en-IN', tz=330, timeout=(10,25), retries=2, backoff_factor=0.5)
-    all_dfs = []
-    for i in range(0, len(keywords), 5):
-        batch = keywords[i:i+5]
-        try:
-            pt.build_payload(kw_list=batch, timeframe=timeframe, geo='IN')
-            df = pt.interest_by_region(resolution='REGION', inc_low_vol=True)
-            df = df[df.sum(axis=1) > 0]
-            all_dfs.append(df)
-            time.sleep(1.2)
-        except Exception as e:
-            return None
-    if not all_dfs:
-        return None
-    return pd.concat(all_dfs, axis=1).reset_index().rename(columns={'geoName':'state'})
+INSIGHT_TEMPLATES = [
+    lambda r: f"Search volume for {r['subcat']} in {r['color'].lower()} has been accelerating for 3 consecutive weeks in {r['city']} — driven by social commerce and reel virality.",
+    lambda r: f"{r['city']}'s {r['group'].lower()} buyers are actively comparing {r['price']} options. This sweet spot covers the widest purchase-intent window.",
+    lambda r: f"{r['color']} has overtaken neutral tones in {r['city']} searches for {r['group'].lower()} — shifting from aspirational to mainstream adoption.",
+    lambda r: f"Wedding season + festival overlap is amplifying {r['subcat']} demand in {r['city']}. The {r['price']} bracket sees the highest add-to-cart signals.",
+    lambda r: f"Influencer-led content featuring {r['subcat']} in {r['color'].lower()} tones is outperforming category average CTR in {r['city']} by ~2×.",
+]
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_timeseries(keywords, timeframe):
-    pt = TrendReq(hl='en-IN', tz=330, timeout=(10,25), retries=2, backoff_factor=0.5)
-    all_dfs = []
-    for i in range(0, len(keywords), 5):
-        batch = keywords[i:i+5]
-        try:
-            pt.build_payload(kw_list=batch, timeframe=timeframe, geo='IN')
-            df = pt.interest_over_time().drop(columns=['isPartial'], errors='ignore')
-            all_dfs.append(df)
-            time.sleep(1.2)
-        except Exception:
-            return None
-    if not all_dfs:
-        return None
-    return pd.concat(all_dfs, axis=1)
+def get_insight(row, rank):
+    return INSIGHT_TEMPLATES[rank % len(INSIGHT_TEMPLATES)](row)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  SIDEBAR — 4-DIMENSION CONTROLS
+#  SIDEBAR
 # ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
-    st.markdown("## 🧵 Framework Controls")
+    st.markdown("## 🔥 Trend Finder")
     st.markdown("---")
 
-    # ── Global ──
-    st.markdown("**Global Settings**")
+    st.markdown('<div class="sidebar-section">⚙️ Scope</div>', unsafe_allow_html=True)
     timeframe_label = st.selectbox("Time Period", list(TIMEFRAME_OPTIONS.keys()), index=1)
-    timeframe = TIMEFRAME_OPTIONS[timeframe_label]
-    use_demo = st.checkbox("Use demo data", value=False,
-                           help="Synthetic data — use if Google rate-limits")
 
-    # ── DIM 1: GEOGRAPHY ──
-    st.markdown('<div class="sidebar-dim-header geo">📍 Dimension 1 — Geography</div>', unsafe_allow_html=True)
-    geo_mode = st.radio("View by", ["Zone", "State"], horizontal=True, key="geo_mode")
-    if geo_mode == "Zone":
-        selected_zones = st.multiselect("Zones", list(GEO_ZONES.keys()),
-                                         default=list(GEO_ZONES.keys())[:3])
-        active_states = [s for z in selected_zones for s in GEO_ZONES.get(z,[])]
+    top_n = st.slider("Top N combinations", min_value=3, max_value=10, value=5)
+
+    st.markdown('<div class="sidebar-section">📍 Geography</div>', unsafe_allow_html=True)
+    selected_cities = st.multiselect(
+        "Cities", list(TOP10_CITIES.keys()),
+        default=list(TOP10_CITIES.keys()),
+        format_func=lambda c: f"#{TOP10_CITIES[c]['rank']} {c}"
+    )
+
+    st.markdown('<div class="sidebar-section">🏷️ Category</div>', unsafe_allow_html=True)
+    sel_groups = st.multiselect("Groups", list(CATEGORIES.keys()), default=list(CATEGORIES.keys()))
+    active_subcats = [s for g in sel_groups for s in CATEGORIES.get(g, {}).keys()]
+
+    st.markdown('<div class="sidebar-section">💰 Price</div>', unsafe_allow_html=True)
+    selected_prices = st.multiselect(
+        "Buckets", list(PRICE_BUCKETS.keys()),
+        default=list(PRICE_BUCKETS.keys())
+    )
+
+    st.markdown('<div class="sidebar-section">🎨 Color</div>', unsafe_allow_html=True)
+    fam_filter = st.radio("Show", ["All", "By family"], horizontal=True)
+    if fam_filter == "By family":
+        families = list(dict.fromkeys(v["family"] for v in ALL_COLORS.values()))
+        sel_fams  = st.multiselect("Families", families, default=families)
+        selected_colors = [c for c,d in ALL_COLORS.items() if d["family"] in sel_fams]
     else:
-        active_states = st.multiselect("States", ALL_STATES, default=ALL_STATES[:6])
-
-    # ── DIM 2: CATEGORY ──
-    st.markdown('<div class="sidebar-dim-header category">🏷️ Dimension 2 — Category</div>', unsafe_allow_html=True)
-    selected_cats = st.multiselect("Categories", list(CATEGORIES.keys()),
-                                    default=["Ethnic Wear","Western Wear","Streetwear"])
-    active_keywords = []
-    for cat in selected_cats:
-        active_keywords += CATEGORIES[cat][:3]   # top 3 per cat to stay within limits
-
-    # ── DIM 3: PRICE ──
-    st.markdown('<div class="sidebar-dim-header price">💰 Dimension 3 — Price Segment</div>', unsafe_allow_html=True)
-    selected_prices = st.multiselect("Price Tiers", list(PRICE_SEGMENTS.keys()),
-                                      default=list(PRICE_SEGMENTS.keys()))
-
-    # ── DIM 4: COLOR ──
-    st.markdown('<div class="sidebar-dim-header color-d">🎨 Dimension 4 — Color Palette</div>', unsafe_allow_html=True)
-    selected_colors = st.multiselect("Color Trends", list(COLOR_TRENDS.keys()),
-                                      default=list(COLOR_TRENDS.keys())[:4])
+        selected_colors = list(ALL_COLORS.keys())
 
     st.markdown("---")
-    st.caption(f"Updated: {datetime.now().strftime('%d %b %Y, %H:%M')}")
-    st.caption("Data: Google Trends · pytrends")
+    st.markdown('<div class="sidebar-section">🔎 Filter Results</div>', unsafe_allow_html=True)
+    min_velocity = st.slider("Min velocity (%)", -35, 60, 0, help="Filter out declining combinations")
+
+    st.markdown("---")
+    st.caption(f"Updated: {datetime.now().strftime('%d %b %Y %H:%M')}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  HEADER
+#  VALIDATION
 # ══════════════════════════════════════════════════════════════════════════════
-st.markdown('<div class="dash-header">', unsafe_allow_html=True)
-st.markdown('<div class="dash-title">India Fashion Intelligence</div>', unsafe_allow_html=True)
-st.markdown('<div class="dash-sub">Geography × Category × Price × Color · Real-time trend analysis</div>', unsafe_allow_html=True)
-
-pills = (
-    f'<span class="dim-pill dim-geo">📍 {len(active_states)} States</span>'
-    f'<span class="dim-pill dim-category">🏷️ {len(selected_cats)} Categories</span>'
-    f'<span class="dim-pill dim-price">💰 {len(selected_prices)} Price Tiers</span>'
-    f'<span class="dim-pill dim-color">🎨 {len(selected_colors)} Palettes</span>'
-    f'<span class="dim-pill" style="background:#1a1a26;color:#6b6878;border:1px solid #2a2a3a">📅 {timeframe_label}</span>'
-)
-st.markdown(pills, unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
-if not active_states or not selected_cats:
-    st.warning("👈 Select at least one zone/state and one category to begin.")
+if not selected_cities or not active_subcats or not selected_prices or not selected_colors:
+    st.warning("👈 Select options in all four dimensions to compute combinations.")
     st.stop()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  FETCH / GENERATE DATA
+#  COMPUTE
 # ══════════════════════════════════════════════════════════════════════════════
-with st.spinner("Fetching trend data across all 4 dimensions..."):
-    keywords_for_fetch = active_keywords[:10]  # cap to avoid rate limits
-
-    if use_demo:
-        region_df     = synthetic_region(keywords_for_fetch)
-        time_df       = synthetic_timeseries(keywords_for_fetch)
-        price_region  = synthetic_price_region({c: CATEGORIES[c][:3] for c in selected_cats}, PRICE_SEGMENTS)
-        color_region  = synthetic_color_region({c: COLOR_TRENDS[c] for c in selected_colors})
-        st.info("📊 Demo mode active — uncheck 'Use demo data' in sidebar for live Google Trends.")
-    else:
-        region_df = fetch_region(keywords_for_fetch, timeframe)
-        if region_df is None:
-            st.warning("⚠️ Google Trends rate-limited. Switching to demo data.")
-            region_df = synthetic_region(keywords_for_fetch)
-            time_df   = synthetic_timeseries(keywords_for_fetch)
-        else:
-            time_df = fetch_timeseries(keywords_for_fetch, timeframe) or synthetic_timeseries(keywords_for_fetch)
-        price_region = synthetic_price_region({c: CATEGORIES[c][:3] for c in selected_cats}, PRICE_SEGMENTS)
-        color_region = synthetic_color_region({c: COLOR_TRENDS[c] for c in selected_colors})
-
-# Filter region_df to active states
-region_df = region_df[region_df['state'].isin(active_states)] if 'state' in region_df.columns else region_df
-kw_cols   = [c for c in keywords_for_fetch if c in region_df.columns]
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  KPI ROW — one card per dimension
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class="section-header">
-  <div class="section-icon" style="background:#ff6b3515">🎯</div>
-  <span class="section-title">4-Dimension Snapshot</span>
-  <span class="section-meta">Top signal per dimension</span>
-</div>
-""", unsafe_allow_html=True)
-
-k1, k2, k3, k4 = st.columns(4)
-
-# GEO KPI
-with k1:
-    if kw_cols:
-        region_df['_total'] = region_df[kw_cols].sum(axis=1)
-        top_state = region_df.nlargest(1,'_total').iloc[0]['state']
-        top_score = int(region_df['_total'].max() / max(len(kw_cols),1))
-        st.markdown(f"""
-        <div class="kpi-card geo">
-          <div class="kpi-dim-label">📍 Geography</div>
-          <div class="kpi-value">{top_state.split()[0]}</div>
-          <div class="kpi-label">Highest interest state</div>
-          <span class="kpi-badge badge-hot">Avg score {top_score}</span>
-        </div>""", unsafe_allow_html=True)
-
-# CATEGORY KPI
-with k2:
-    cat_scores = {}
-    for cat in selected_cats:
-        kws = [k for k in CATEGORIES[cat][:3] if k in kw_cols]
-        cat_scores[cat] = int(region_df[kws].values.mean()) if kws else 0
-    if cat_scores:
-        top_cat = max(cat_scores, key=cat_scores.get)
-        top_cat_score = cat_scores[top_cat]
-        badge = "badge-hot" if top_cat_score > 65 else "badge-rise" if top_cat_score > 40 else "badge-cool"
-        st.markdown(f"""
-        <div class="kpi-card category">
-          <div class="kpi-dim-label">🏷️ Category</div>
-          <div class="kpi-value" style="font-size:22px;padding-top:6px">{top_cat}</div>
-          <div class="kpi-label">Trending category</div>
-          <span class="kpi-badge {badge}">Score {top_cat_score}</span>
-        </div>""", unsafe_allow_html=True)
-
-# PRICE KPI
-with k3:
-    if selected_prices:
-        price_avgs = price_region[price_region['price_segment'].isin(selected_prices)]\
-                        .groupby('price_segment')['score'].mean()
-        top_price  = price_avgs.idxmax()
-        top_price_score = int(price_avgs.max())
-        short_label = top_price.split("(")[0].strip()
-        st.markdown(f"""
-        <div class="kpi-card price">
-          <div class="kpi-dim-label">💰 Price Segment</div>
-          <div class="kpi-value" style="font-size:20px;padding-top:6px">{short_label}</div>
-          <div class="kpi-label">Most searched tier</div>
-          <span class="kpi-badge badge-cool">Avg {top_price_score}</span>
-        </div>""", unsafe_allow_html=True)
-
-# COLOR KPI
-with k4:
-    if selected_colors:
-        color_avgs = color_region[color_region['palette'].isin(selected_colors)]\
-                        .groupby('palette')['score'].mean()
-        top_color = color_avgs.idxmax()
-        top_color_score = int(color_avgs.max())
-        color_hex = COLOR_TRENDS[top_color]['hex'][0]
-        st.markdown(f"""
-        <div class="kpi-card color-dim">
-          <div class="kpi-dim-label">🎨 Color Palette</div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-            <div style="width:32px;height:32px;background:{color_hex};border-radius:3px;flex-shrink:0"></div>
-            <div class="kpi-value" style="font-size:20px">{top_color}</div>
-          </div>
-          <div class="kpi-label">Trending palette</div>
-          <span class="kpi-badge badge-rise">Score {top_color_score}</span>
-        </div>""", unsafe_allow_html=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 1 — GEOGRAPHY ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class="section-header">
-  <div class="section-icon" style="background:#ff6b3518">📍</div>
-  <span class="section-title">Dimension 1 — Geography</span>
-  <span class="section-meta">State-level search intensity</span>
-</div>
-""", unsafe_allow_html=True)
-
-g1, g2 = st.columns([3, 2])
-
-with g1:
-    # Bubble chart: states × total interest
-    if kw_cols:
-        geo_plot = region_df[['state'] + kw_cols].copy()
-        geo_plot['total'] = geo_plot[kw_cols].sum(axis=1)
-        geo_plot['dominant'] = geo_plot[kw_cols].idxmax(axis=1)
-        geo_plot = geo_plot.sort_values('total', ascending=True)
-
-        # Assign zone
-        state_to_zone = {s: z for z, states in GEO_ZONES.items() for s in states}
-        geo_plot['zone'] = geo_plot['state'].map(state_to_zone).fillna("Other")
-
-        zone_colors = {
-            "North India": "#ff6b35", "South India": "#7c3aed",
-            "West India": "#10b981",  "East India":  "#f59e0b",
-            "Central India": "#3b82f6", "Other": "#6b7280"
-        }
-
-        fig_geo = px.bar(
-            geo_plot, x='total', y='state',
-            color='zone', orientation='h',
-            color_discrete_map=zone_colors,
-            custom_data=['dominant','zone'],
-            labels={'total': 'Total Interest Score', 'state': ''}
-        )
-        fig_geo.update_traces(
-            hovertemplate="<b>%{y}</b><br>Score: %{x}<br>Top trend: %{customdata[0]}<br>Zone: %{customdata[1]}<extra></extra>"
-        )
-        fig_geo.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-            legend=dict(font=dict(family="IBM Plex Mono", size=10),
-                        bgcolor="rgba(0,0,0,0)", title="Zone"),
-            xaxis=dict(gridcolor="#2a2a3a", title=""),
-            yaxis=dict(gridcolor="rgba(0,0,0,0)"),
-            margin=dict(l=0,r=0,t=10,b=0), height=360
-        )
-        st.plotly_chart(fig_geo, use_container_width=True)
-
-with g2:
-    # Zone aggregation pie
-    if kw_cols and 'zone' in geo_plot.columns:
-        zone_totals = geo_plot.groupby('zone')['total'].sum().reset_index()
-        fig_zone = px.pie(
-            zone_totals, values='total', names='zone',
-            color='zone', color_discrete_map=zone_colors,
-            hole=0.55
-        )
-        fig_zone.update_traces(
-            textfont=dict(family="IBM Plex Mono", size=10),
-            hovertemplate="<b>%{label}</b><br>Score: %{value}<br>Share: %{percent}<extra></extra>"
-        )
-        fig_zone.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-            legend=dict(font=dict(family="IBM Plex Mono", size=10), bgcolor="rgba(0,0,0,0)"),
-            margin=dict(l=0,r=0,t=10,b=0), height=360,
-            annotations=[dict(text="by<br>Zone", x=0.5, y=0.5, font_size=12,
-                              font_family="IBM Plex Mono", font_color="#e8e4dc",
-                              showarrow=False)]
-        )
-        st.plotly_chart(fig_zone, use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 2 — CATEGORY ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class="section-header">
-  <div class="section-icon" style="background:#7c3aed18">🏷️</div>
-  <span class="section-title">Dimension 2 — Category</span>
-  <span class="section-meta">Trend velocity by fashion segment</span>
-</div>
-""", unsafe_allow_html=True)
-
-c1, c2 = st.columns([2, 3])
-
-with c1:
-    # Category × Zone heatmap
-    cat_zone_data = []
-    for cat in selected_cats:
-        cat_kws = [k for k in CATEGORIES[cat][:3] if k in kw_cols]
-        if not cat_kws:
-            continue
-        for zone, states in GEO_ZONES.items():
-            zone_states = [s for s in states if s in active_states]
-            if not zone_states:
-                continue
-            sub = region_df[region_df['state'].isin(zone_states)]
-            score = int(sub[cat_kws].values.mean()) if len(sub) > 0 else 0
-            cat_zone_data.append({"category": cat, "zone": zone, "score": score})
-
-    if cat_zone_data:
-        cz_df = pd.DataFrame(cat_zone_data)
-        cz_pivot = cz_df.pivot(index='category', columns='zone', values='score').fillna(0)
-        fig_heat = px.imshow(
-            cz_pivot,
-            color_continuous_scale=[[0,"#12121a"],[0.4,"#7c3aed50"],[1,"#a78bfa"]],
-            aspect="auto", text_auto=True,
-            labels=dict(color="Interest")
-        )
-        fig_heat.update_traces(
-            textfont=dict(family="IBM Plex Mono", size=10),
-            hovertemplate="<b>%{y}</b> · %{x}<br>Score: %{z}<extra></extra>"
-        )
-        fig_heat.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-            margin=dict(l=0,r=0,t=10,b=0), height=320,
-            xaxis=dict(tickfont=dict(family="IBM Plex Mono", size=9)),
-            yaxis=dict(tickfont=dict(family="IBM Plex Mono", size=9)),
-            coloraxis_showscale=False
-        )
-        st.plotly_chart(fig_heat, use_container_width=True)
-
-with c2:
-    # Category trend lines over time
-    cat_series = {}
-    for cat in selected_cats:
-        cat_kws = [k for k in CATEGORIES[cat][:3] if k in time_df.columns]
-        if cat_kws:
-            cat_series[cat] = time_df[cat_kws].mean(axis=1)
-
-    if cat_series:
-        cat_colors = ["#ff6b35","#7c3aed","#10b981","#f59e0b","#3b82f6","#ec4899"]
-        fig_lines = go.Figure()
-        for i, (cat, series) in enumerate(cat_series.items()):
-            fig_lines.add_trace(go.Scatter(
-                x=series.index, y=series.values,
-                name=cat, mode='lines',
-                line=dict(color=cat_colors[i % len(cat_colors)], width=2),
-                fill='tozeroy',
-                fillcolor=cat_colors[i % len(cat_colors)].replace("#","rgba(") + ",0.04)" if "#" in cat_colors[i % len(cat_colors)] else "rgba(255,107,53,0.04)",
-                hovertemplate=f"<b>{cat}</b><br>%{{x|%d %b}}: %{{y:.0f}}<extra></extra>"
-            ))
-        fig_lines.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-            legend=dict(font=dict(family="IBM Plex Mono", size=10), bgcolor="rgba(0,0,0,0)"),
-            xaxis=dict(gridcolor="#2a2a3a20", title=""),
-            yaxis=dict(gridcolor="#2a2a3a", title="Interest (0–100)", range=[0,105]),
-            margin=dict(l=0,r=0,t=10,b=0), height=320,
-            hovermode="x unified"
-        )
-        st.plotly_chart(fig_lines, use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 3 — PRICE ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class="section-header">
-  <div class="section-icon" style="background:#10b98118">💰</div>
-  <span class="section-title">Dimension 3 — Price Segment</span>
-  <span class="section-meta">Purchase intent by price tier across geographies</span>
-</div>
-""", unsafe_allow_html=True)
-
-p1, p2 = st.columns([2, 3])
-
-with p1:
-    # Price × Category bubble chart
-    if selected_prices and selected_cats:
-        pc_data = price_region[
-            (price_region['price_segment'].isin(selected_prices)) &
-            (price_region['category'].isin(selected_cats)) &
-            (price_region['state'].isin(active_states))
-        ].groupby(['price_segment','category'])['score'].mean().reset_index()
-
-        price_order = [p for p in PRICE_SEGMENTS.keys() if p in selected_prices]
-        price_cols  = [PRICE_SEGMENTS[p]['color'] for p in price_order]
-
-        fig_pc = px.bar(
-            pc_data, x='category', y='score',
-            color='price_segment', barmode='group',
-            color_discrete_sequence=price_cols,
-            labels={'score':'Avg Interest','category':'','price_segment':'Tier'}
-        )
-        fig_pc.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-            legend=dict(font=dict(family="IBM Plex Mono", size=9), bgcolor="rgba(0,0,0,0)", title=""),
-            xaxis=dict(gridcolor="rgba(0,0,0,0)", tickangle=-20,
-                       tickfont=dict(family="IBM Plex Mono", size=9)),
-            yaxis=dict(gridcolor="#2a2a3a"),
-            margin=dict(l=0,r=0,t=10,b=0), height=300
-        )
-        st.plotly_chart(fig_pc, use_container_width=True)
-
-with p2:
-    # Price × State heatmap (top states)
-    if selected_prices:
-        top_states = region_df.nlargest(min(12, len(region_df)), '_total')['state'].tolist()
-        ps_data = price_region[
-            (price_region['state'].isin(top_states)) &
-            (price_region['price_segment'].isin(selected_prices))
-        ].groupby(['state','price_segment'])['score'].mean().reset_index()
-
-        ps_pivot = ps_data.pivot(index='state', columns='price_segment', values='score').fillna(0)
-        ps_pivot = ps_pivot[[c for c in PRICE_SEGMENTS.keys() if c in ps_pivot.columns]]
-
-        fig_ps = px.imshow(
-            ps_pivot,
-            color_continuous_scale=[[0,"#12121a"],[0.5,"#10b98150"],[1,"#34d399"]],
-            aspect="auto", text_auto=True,
-            labels=dict(color="Score")
-        )
-        fig_ps.update_traces(textfont=dict(family="IBM Plex Mono", size=10))
-        fig_ps.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-            margin=dict(l=0,r=0,t=10,b=0), height=300,
-            xaxis=dict(tickfont=dict(family="IBM Plex Mono", size=9), tickangle=-15),
-            yaxis=dict(tickfont=dict(family="IBM Plex Mono", size=9)),
-            coloraxis_showscale=False
-        )
-        st.plotly_chart(fig_ps, use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SECTION 4 — COLOR ANALYSIS
-# ══════════════════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class="section-header">
-  <div class="section-icon" style="background:#f59e0b18">🎨</div>
-  <span class="section-title">Dimension 4 — Color Palette</span>
-  <span class="section-meta">Regional colour preference mapping</span>
-</div>
-""", unsafe_allow_html=True)
-
-cl1, cl2, cl3 = st.columns([2, 2, 1])
-
-with cl1:
-    # Color × Zone radar
-    if selected_colors:
-        zone_color_data = []
-        for color in selected_colors:
-            for zone, states in GEO_ZONES.items():
-                zone_states = [s for s in states if s in active_states]
-                if not zone_states:
-                    continue
-                sub = color_region[
-                    (color_region['palette'] == color) &
-                    (color_region['state'].isin(zone_states))
-                ]
-                score = int(sub['score'].mean()) if len(sub) > 0 else 0
-                zone_color_data.append({"palette": color, "zone": zone, "score": score})
-
-        if zone_color_data:
-            zc_df = pd.DataFrame(zone_color_data)
-            palette_colors = ["#ff6b35","#a78bfa","#34d399","#fbbf24","#fb923c","#60a5fa"]
-            fig_color_zone = go.Figure()
-            zones_list = [z for z in GEO_ZONES.keys() if z in zc_df['zone'].unique()]
-            for i, palette in enumerate(selected_colors):
-                sub = zc_df[zc_df['palette'] == palette]
-                sub = sub.set_index('zone').reindex(zones_list).fillna(0)
-                fig_color_zone.add_trace(go.Scatterpolar(
-                    r=sub['score'].tolist() + [sub['score'].tolist()[0]],
-                    theta=zones_list + [zones_list[0]],
-                    name=palette, mode='lines+markers',
-                    line=dict(color=palette_colors[i % len(palette_colors)], width=2),
-                    marker=dict(size=5),
-                    fill='toself',
-                    fillcolor=palette_colors[i % len(palette_colors)] + "18"
-                ))
-            fig_color_zone.update_layout(
-                polar=dict(
-                    bgcolor="rgba(0,0,0,0)",
-                    radialaxis=dict(visible=True, range=[0,100],
-                                   gridcolor="#2a2a3a", tickfont=dict(size=8, family="IBM Plex Mono"),
-                                   tickcolor="#6b6878"),
-                    angularaxis=dict(tickfont=dict(size=9, family="IBM Plex Mono", color="#e8e4dc"),
-                                     gridcolor="#2a2a3a")
-                ),
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-                legend=dict(font=dict(family="IBM Plex Mono", size=9), bgcolor="rgba(0,0,0,0)"),
-                margin=dict(l=20,r=20,t=20,b=20), height=300
-            )
-            st.plotly_chart(fig_color_zone, use_container_width=True)
-
-with cl2:
-    # Color trend lines over time
-    color_time_data = {}
-    for color in selected_colors:
-        kws = [k for k in COLOR_TRENDS[color]['keywords'] if k in time_df.columns]
-        if kws:
-            color_time_data[color] = time_df[kws].mean(axis=1)
-        else:
-            # synthetic fallback for color
-            rng = np.random.default_rng(sum(ord(c) for c in color))
-            n = len(time_df)
-            vals = np.clip(rng.integers(20,70) + np.linspace(0,20,n) + rng.normal(0,8,n), 0, 100)
-            color_time_data[color] = pd.Series(vals, index=time_df.index)
-
-    palette_line_colors = ["#ff6b35","#a78bfa","#34d399","#fbbf24","#fb923c","#60a5fa"]
-    fig_clr_time = go.Figure()
-    for i, (pal, series) in enumerate(color_time_data.items()):
-        fig_clr_time.add_trace(go.Scatter(
-            x=series.index, y=series.values, name=pal, mode='lines',
-            line=dict(color=palette_line_colors[i % len(palette_line_colors)], width=1.8),
-            hovertemplate=f"<b>{pal}</b><br>%{{x|%d %b}}: %{{y:.0f}}<extra></extra>"
-        ))
-    fig_clr_time.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-        legend=dict(font=dict(family="IBM Plex Mono", size=9), bgcolor="rgba(0,0,0,0)"),
-        xaxis=dict(gridcolor="#2a2a3a20", title=""),
-        yaxis=dict(gridcolor="#2a2a3a", title="", range=[0,105]),
-        margin=dict(l=0,r=0,t=10,b=0), height=300,
-        hovermode="x unified"
+with st.spinner("Scoring all combinations across 4 dimensions..."):
+    all_combos = compute_all_combinations(
+        tuple(sorted(selected_cities)),
+        tuple(sorted(active_subcats)),
+        tuple(sorted(selected_prices)),
+        tuple(sorted(selected_colors)),
     )
-    st.plotly_chart(fig_clr_time, use_container_width=True)
 
-with cl3:
-    # Color swatches
-    st.markdown("<div style='margin-top:8px'>", unsafe_allow_html=True)
-    for palette in selected_colors:
-        hexes = COLOR_TRENDS[palette]['hex']
-        swatches = "".join([
-            f'<div style="width:22px;height:22px;background:{h};border-radius:2px;'
-            f'border:1px solid rgba(255,255,255,0.1)"></div>'
-            for h in hexes
-        ])
-        avg_score = int(color_region[color_region['palette']==palette]['score'].mean())
-        st.markdown(f"""
-        <div style="background:#12121a;border:1px solid #2a2a3a;padding:10px 12px;margin-bottom:8px;border-radius:2px">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6b6878;margin-bottom:6px">{palette.upper()}</div>
-          <div style="display:flex;gap:4px;margin-bottom:6px">{swatches}</div>
-          <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700">{avg_score}</div>
-        </div>""", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+# Apply velocity filter
+filtered = all_combos[all_combos["velocity"] >= min_velocity].reset_index(drop=True)
+top_combos = filtered.head(top_n)
+
+total_combos = len(all_combos)
+above_75     = int((all_combos["score_norm"] >= 75).sum())
+avg_velocity = float(all_combos["velocity"].mean())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  CROSS-DIMENSION ANALYSIS
+#  PAGE HEADER
 # ══════════════════════════════════════════════════════════════════════════════
-st.markdown("""
-<div class="section-header">
-  <div class="section-icon" style="background:#3b82f618">⚡</div>
-  <span class="section-title">Cross-Dimension Signals</span>
-  <span class="section-meta">Intersections that matter</span>
+st.markdown(f"""
+<div class="page-header">
+  <div class="page-label">
+    <span class="live-dot"></span>India Fashion Intelligence · {timeframe_label}
+  </div>
+  <div class="page-title">Top <em>{top_n}</em> Trending<br>Combinations</div>
+  <div class="page-subtitle">
+    Geography × Category × Price × Color — scored across {total_combos:,} possible combinations
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
-xd1, xd2 = st.columns([3, 2])
+# Stats bar
+s1, s2, s3, s4 = st.columns(4)
+rank_colors = ["var(--rank1)","var(--rank2)","var(--rank3)","var(--rank4)","var(--rank5)"]
+with s1:
+    st.markdown(f"""<div style="background:var(--surface);border:1px solid var(--border);padding:16px 20px">
+      <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Combinations scored</div>
+      <div style="font-family:'Unbounded',sans-serif;font-size:26px;font-weight:700">{total_combos:,}</div>
+    </div>""", unsafe_allow_html=True)
+with s2:
+    st.markdown(f"""<div style="background:var(--surface);border:1px solid var(--border);padding:16px 20px">
+      <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">High-signal (≥75)</div>
+      <div style="font-family:'Unbounded',sans-serif;font-size:26px;font-weight:700;color:var(--amber)">{above_75}</div>
+    </div>""", unsafe_allow_html=True)
+with s3:
+    vel_color = "var(--teal)" if avg_velocity > 0 else "var(--crimson)"
+    vel_arrow = "↑" if avg_velocity > 0 else "↓"
+    st.markdown(f"""<div style="background:var(--surface);border:1px solid var(--border);padding:16px 20px">
+      <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Avg velocity</div>
+      <div style="font-family:'Unbounded',sans-serif;font-size:26px;font-weight:700;color:{vel_color}">{vel_arrow}{avg_velocity:.1f}%</div>
+    </div>""", unsafe_allow_html=True)
+with s4:
+    top1 = top_combos.iloc[0]
+    st.markdown(f"""<div style="background:var(--surface);border:1px solid var(--border);padding:16px 20px">
+      <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Top signal city</div>
+      <div style="font-family:'Unbounded',sans-serif;font-size:22px;font-weight:700;color:var(--rank1)">{top1['city']}</div>
+    </div>""", unsafe_allow_html=True)
 
-with xd1:
-    # Scatter: state vs. category score vs. dominant price tier bubble
-    if kw_cols and selected_prices:
-        scatter_rows = []
-        for cat in selected_cats[:4]:
-            cat_kws = [k for k in CATEGORIES[cat][:3] if k in kw_cols]
-            if not cat_kws:
-                continue
-            for state in active_states[:15]:
-                row = region_df[region_df['state'] == state]
-                if row.empty:
-                    continue
-                cat_score = int(row[cat_kws].values.mean()) if cat_kws else 0
-                price_row = price_region[
-                    (price_region['state'] == state) &
-                    (price_region['category'] == cat) &
-                    (price_region['price_segment'].isin(selected_prices))
-                ]
-                if price_row.empty:
-                    continue
-                dom_price = price_row.loc[price_row['score'].idxmax(), 'price_segment']
-                price_score = int(price_row['score'].max())
-                scatter_rows.append({
-                    "state": state, "category": cat,
-                    "cat_score": cat_score,
-                    "price_score": price_score,
-                    "dominant_price": dom_price,
-                    "zone": state_to_zone.get(state, "Other")
-                })
 
-        if scatter_rows:
-            sc_df = pd.DataFrame(scatter_rows)
-            fig_scatter = px.scatter(
-                sc_df, x='cat_score', y='price_score',
-                color='zone', symbol='category',
-                size='cat_score', size_max=22,
-                hover_data=['state','dominant_price'],
-                color_discrete_map=zone_colors,
-                labels={'cat_score':'Category Interest','price_score':'Price Tier Interest'}
-            )
-            fig_scatter.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="IBM Plex Sans", color="#e8e4dc"),
-                legend=dict(font=dict(family="IBM Plex Mono", size=9), bgcolor="rgba(0,0,0,0)"),
-                xaxis=dict(gridcolor="#2a2a3a"),
-                yaxis=dict(gridcolor="#2a2a3a"),
-                margin=dict(l=0,r=0,t=10,b=0), height=320
-            )
-            st.plotly_chart(fig_scatter, use_container_width=True)
+# ══════════════════════════════════════════════════════════════════════════════
+#  TOP COMBINATION CARDS
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("<hr class='section-rule'>", unsafe_allow_html=True)
+st.markdown(f'<div class="section-label">🏆 Top {top_n} Trending Combinations</div>', unsafe_allow_html=True)
 
-with xd2:
-    # Auto-generated insights
-    st.markdown("**🔍 Auto Insights**")
-    insights = []
+RANK_LABELS  = ["#1 — HOTTEST","#2 — RISING FAST","#3 — STRONG SIGNAL","#4 — EMERGING","#5 — WATCH THIS"]
+RANK_COLORS  = ["#e8a020","#c0c0c0","#cd7f32","#3a8a6a","#5a4a8a"]
 
-    # Geo insight
-    if kw_cols and 'state' in region_df.columns:
-        top_s = region_df.nlargest(1,'_total').iloc[0]
-        insights.append(("geo", "📍",
-            f"<b>{top_s['state']}</b> leads all fashion interest — consider targeting it first."))
+for idx, row in top_combos.iterrows():
+    rank     = idx + 1
+    rk_cls   = f"rank-{rank}"
+    rk_color = RANK_COLORS[min(rank-1, 4)]
+    rk_label = RANK_LABELS[min(rank-1, len(RANK_LABELS)-1)]
 
-    # Category insight
-    if cat_scores:
-        best = max(cat_scores, key=cat_scores.get)
-        worst = min(cat_scores, key=cat_scores.get)
-        insights.append(("category", "🏷️",
-            f"<b>{best}</b> outperforms <b>{worst}</b> by {cat_scores[best]-cat_scores[worst]} pts across all zones."))
+    color_hex   = ALL_COLORS.get(row["color"], {}).get("hex","#888")
+    price_color = PRICE_BUCKETS.get(row["price"], {}).get("color","#888")
+    vel         = int(row["velocity"])
+    vel_sign    = "+" if vel >= 0 else ""
+    vel_cls     = "vel-up" if vel >= 0 else "vel-down"
+    vel_arrow   = "▲" if vel >= 0 else "▼"
+    score       = round(row["score_norm"], 1)
 
-    # Price insight
-    if selected_prices:
-        budget_states = price_region[
-            (price_region['price_segment'] == "Budget (< ₹500)") &
-            (price_region['state'].isin(active_states))
-        ].nlargest(3,'score')['state'].tolist()
-        if budget_states:
-            insights.append(("price", "💰",
-                f"Budget segment strongest in <b>{', '.join(budget_states[:2])}</b> — high-volume, low-ASP opportunity."))
+    # Which cities rank this combo highest?
+    city_scores_for_combo = []
+    for c in selected_cities:
+        s = score_combination(c, row["subcat"], row["price"], row["color"])
+        city_scores_for_combo.append((c, s["composite"]))
+    city_scores_for_combo.sort(key=lambda x: -x[1])
+    top3_cities  = [x[0] for x in city_scores_for_combo[:3]]
+    other_cities = [x[0] for x in city_scores_for_combo[3:]]
 
-        luxury_states = price_region[
-            (price_region['price_segment'] == "Luxury (₹8000+)") &
-            (price_region['state'].isin(active_states))
-        ].nlargest(3,'score')['state'].tolist()
-        if luxury_states:
-            insights.append(("price", "💰",
-                f"Luxury tier peaks in <b>{', '.join(luxury_states[:2])}</b> — premium positioning viable here."))
+    insight_text = get_insight(row, idx)
 
-    # Color insight
-    if selected_colors:
-        top_pal = color_region[color_region['palette'].isin(selected_colors)]\
-                     .groupby('palette')['score'].mean().idxmax()
-        insights.append(("color-d", "🎨",
-            f"<b>{top_pal}</b> leads colour searches — incorporate into seasonal product drops."))
+    # Sparkline (mini plotly)
+    spark_vals = timeseries_for_combo(row["city"], row["subcat"], row["price"], row["color"])
+    fig_spark  = go.Figure(go.Scatter(
+        x=list(range(len(spark_vals))), y=spark_vals.tolist(),
+        mode="lines", fill="tozeroy",
+        line=dict(color=rk_color, width=2),
+        fillcolor=rk_color + "18",
+        hoverinfo="skip"
+    ))
+    fig_spark.update_layout(
+        height=80, margin=dict(l=0,r=0,t=0,b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False), yaxis=dict(visible=False, range=[0,105]),
+        showlegend=False
+    )
 
-    for dim, icon, text in insights:
+    # City chips
+    city_chips_html = "".join([
+        f'<span class="city-chip strong">{c}</span>' for c in top3_cities
+    ] + [
+        f'<span class="city-chip">{c}</span>' for c in other_cities
+    ])
+
+    # Dimension bar fills
+    def bar(score_val, color_val):
+        return f'<div class="dim-bar-fill" style="width:{min(score_val,100)}%;background:{color_val}"></div>'
+
+    st.markdown(f"""
+    <div class="combo-card {rk_cls}">
+      <div class="rank-badge">{rank}</div>
+      <div class="combo-body">
+
+        <div class="combo-header">
+          <div>
+            <div class="combo-rank-num">{rk_label}</div>
+            <div class="combo-name">{row['subcat']} · {row['color']}</div>
+            <div class="combo-tags">
+              <span class="tag tag-geo">📍 {row['city']}</span>
+              <span class="tag tag-cat">🏷️ {row['group']}</span>
+              <span class="tag tag-price">💰 {row['price']}</span>
+              <span class="tag tag-color" style="border-color:{color_hex}60;background:{color_hex}10">
+                <span style="display:inline-block;width:8px;height:8px;background:{color_hex};vertical-align:middle;margin-right:4px;border-radius:1px"></span>{row['color']}
+              </span>
+            </div>
+          </div>
+          <div class="score-ring-wrap">
+            <div class="score-ring-val" style="color:{rk_color}">{score}</div>
+            <div class="score-ring-label">Trend Score</div>
+            <div class="velocity {vel_cls}">{vel_arrow} {vel_sign}{vel}% MoM</div>
+          </div>
+        </div>
+
+        <div class="dim-bars">
+          <div class="dim-bar-row">
+            <div class="dim-bar-label">📍 Geo Reach</div>
+            <div class="dim-bar-track">{bar(row['geo_score'],'#f97316')}</div>
+            <div class="dim-bar-val">{row['geo_score']}/100</div>
+          </div>
+          <div class="dim-bar-row">
+            <div class="dim-bar-label">🏷️ Category Fit</div>
+            <div class="dim-bar-track">{bar(row['cat_score'],'#38bdf8')}</div>
+            <div class="dim-bar-val">{row['cat_score']}/100</div>
+          </div>
+          <div class="dim-bar-row">
+            <div class="dim-bar-label">💰 Price Demand</div>
+            <div class="dim-bar-track">{bar(row['price_score'], price_color)}</div>
+            <div class="dim-bar-val">{row['price_score']}/100</div>
+          </div>
+          <div class="dim-bar-row">
+            <div class="dim-bar-label">🎨 Color Pull</div>
+            <div class="dim-bar-track">{bar(row['color_score'], color_hex)}</div>
+            <div class="dim-bar-val">{row['color_score']}/100</div>
+          </div>
+        </div>
+
+        <div class="insight-line">"{insight_text}"</div>
+
+        <div class="city-reach">
+          <span style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-right:4px;align-self:center">Strongest in →</span>
+          {city_chips_html}
+        </div>
+
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Spark + score breakdown side by side
+    sc1, sc2 = st.columns([3, 1])
+    with sc1:
+        st.plotly_chart(fig_spark, use_container_width=True, config={"displayModeBar": False})
+    with sc2:
         st.markdown(f"""
-        <div class="insight-row {dim}">
-          <span class="insight-icon">{icon}</span>
-          <span>{text}</span>
-        </div>""", unsafe_allow_html=True)
+        <div style="background:var(--surface2);border:1px solid var(--border);padding:14px;height:80px;display:flex;flex-direction:column;justify-content:center;gap:4px">
+          <div style="font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)">60-day trend</div>
+          <div style="font-size:11px;color:var(--text)">Peak: <b>{int(timeseries_for_combo(row['city'],row['subcat'],row['price'],row['color']).max())}</b></div>
+          <div style="font-size:11px;color:var(--text)">Last 7d avg: <b>{int(timeseries_for_combo(row['city'],row['subcat'],row['price'],row['color'])[-7:].mean())}</b></div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  DATA TABLE (downloadable)
+#  SUPPORTING ANALYTICS
 # ══════════════════════════════════════════════════════════════════════════════
-with st.expander("📋 Raw Data Table — Geography × Category × Price × Color"):
-    tab1, tab2, tab3, tab4 = st.tabs(["By State", "By Category", "By Price Tier", "By Color"])
+st.markdown("<hr class='section-rule'>", unsafe_allow_html=True)
+st.markdown('<div class="section-label">📊 Supporting Analytics</div>', unsafe_allow_html=True)
 
-    with tab1:
-        if kw_cols:
-            disp = region_df[['state'] + kw_cols].copy()
-            disp['zone'] = disp['state'].map(state_to_zone)
-            st.dataframe(disp.set_index('state'), use_container_width=True)
-            csv = disp.to_csv(index=False)
-            st.download_button("⬇️ Download CSV", csv, "geo_trends.csv", "text/csv")
+tab1, tab2, tab3, tab4 = st.tabs(["Score Distribution","City × Category","Price Landscape","Color Heatmap"])
 
-    with tab2:
-        if cat_scores:
-            cat_df = pd.DataFrame(list(cat_scores.items()), columns=['Category','Avg Score'])
-            cat_df = cat_df.sort_values('Avg Score', ascending=False)
-            st.dataframe(cat_df.set_index('Category'), use_container_width=True)
+with tab1:
+    fig_dist = px.histogram(
+        all_combos, x="score_norm", nbins=40,
+        color_discrete_sequence=["#e8a020"],
+        labels={"score_norm":"Trend Score (0–100)","count":"# Combinations"},
+        title=f"Distribution of all {total_combos:,} scored combinations"
+    )
+    # Mark top N
+    cutoff = float(top_combos["score_norm"].min())
+    fig_dist.add_vline(x=cutoff, line_color="#ef4444", line_dash="dash",
+                       annotation_text=f"Top {top_n} cutoff ({cutoff:.1f})",
+                       annotation_font_color="#ef4444")
+    fig_dist.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="DM Mono",color="#f0ead8"),
+        xaxis=dict(gridcolor="#2a2a2a"), yaxis=dict(gridcolor="#2a2a2a"),
+        margin=dict(l=0,r=0,t=40,b=0), height=320
+    )
+    st.plotly_chart(fig_dist, use_container_width=True)
 
-    with tab3:
-        if selected_prices:
-            pt_df = price_region[
-                (price_region['price_segment'].isin(selected_prices)) &
-                (price_region['state'].isin(active_states))
-            ].groupby(['price_segment','category'])['score'].mean().round(1).reset_index()
-            st.dataframe(pt_df, use_container_width=True)
-            st.download_button("⬇️ Download CSV", pt_df.to_csv(index=False), "price_trends.csv","text/csv")
+with tab2:
+    city_cat = all_combos.groupby(["city","group"])["score_norm"].mean().reset_index()
+    pivot_cc = city_cat.pivot(index="group", columns="city", values="score_norm").fillna(0)
+    fig_cc = px.imshow(
+        pivot_cc, color_continuous_scale=[[0,"#141414"],[0.5,"#e8a02040"],[1,"#e8a020"]],
+        aspect="auto", text_auto=".0f", labels=dict(color="Avg Score")
+    )
+    fig_cc.update_traces(textfont=dict(family="DM Mono",size=9))
+    fig_cc.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", font=dict(family="DM Mono",color="#f0ead8"),
+        xaxis=dict(tickfont=dict(size=9)), yaxis=dict(tickfont=dict(size=9)),
+        coloraxis_showscale=False,
+        margin=dict(l=0,r=0,t=10,b=0), height=380
+    )
+    st.plotly_chart(fig_cc, use_container_width=True)
 
-    with tab4:
-        if selected_colors:
-            cr_df = color_region[
-                (color_region['palette'].isin(selected_colors)) &
-                (color_region['state'].isin(active_states))
-            ].groupby(['palette','state'])['score'].mean().round(1).reset_index()
-            st.dataframe(cr_df, use_container_width=True)
+with tab3:
+    price_grp = all_combos.groupby(["price","group"])["score_norm"].mean().reset_index()
+    price_order = [p for p in PRICE_BUCKETS.keys() if p in price_grp["price"].unique()]
+    fig_price = px.bar(
+        price_grp, x="price", y="score_norm", color="group",
+        barmode="stack", category_orders={"price": price_order},
+        labels={"score_norm":"Avg Trend Score","price":"Price Bucket","group":"Category"},
+        color_discrete_sequence=px.colors.qualitative.Set3
+    )
+    fig_price.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="DM Mono",color="#f0ead8"),
+        xaxis=dict(gridcolor="rgba(0,0,0,0)", tickfont=dict(size=10)),
+        yaxis=dict(gridcolor="#2a2a2a"),
+        legend=dict(font=dict(size=9), bgcolor="rgba(0,0,0,0)"),
+        margin=dict(l=0,r=0,t=10,b=0), height=320
+    )
+    st.plotly_chart(fig_price, use_container_width=True)
+
+with tab4:
+    color_city = all_combos.groupby(["color","city"])["score_norm"].mean().reset_index()
+    pivot_col  = color_city.pivot(index="color", columns="city", values="score_norm").fillna(0)
+    pivot_col["_avg"] = pivot_col.mean(axis=1)
+    pivot_col  = pivot_col.sort_values("_avg",ascending=False).drop(columns="_avg")
+    fig_col = px.imshow(
+        pivot_col, color_continuous_scale=[[0,"#141414"],[0.5,"#6b3fa040"],[1,"#e879f9"]],
+        aspect="auto", text_auto=".0f", labels=dict(color="Avg Score")
+    )
+    fig_col.update_traces(textfont=dict(family="DM Mono",size=8))
+    fig_col.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", font=dict(family="DM Mono",color="#f0ead8"),
+        xaxis=dict(tickfont=dict(size=9)), yaxis=dict(tickfont=dict(size=9)),
+        coloraxis_showscale=False,
+        margin=dict(l=0,r=0,t=10,b=0), height=600
+    )
+    st.plotly_chart(fig_col, use_container_width=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  EXPORT
+# ══════════════════════════════════════════════════════════════════════════════
+with st.expander("📋 Export top combinations"):
+    export_df = top_combos[["city","group","subcat","price","color","score_norm","velocity","geo_score","cat_score","price_score","color_score"]].copy()
+    export_df.columns = ["City","Group","Sub-Category","Price","Color","Trend Score","Velocity %","Geo Score","Cat Score","Price Score","Color Score"]
+    st.dataframe(export_df.set_index("City"), use_container_width=True)
+    st.download_button("⬇️ Download CSV", export_df.to_csv(index=False), "top_combinations.csv","text/csv")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  FOOTER
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
-<div style="text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;
-color:#3a3a5a;letter-spacing:0.18em;padding:32px 0 16px;
-border-top:1px solid #1a1a26;margin-top:32px">
-INDIA FASHION INTELLIGENCE · GEOGRAPHY × CATEGORY × PRICE × COLOR · POWERED BY GOOGLE TRENDS
+<div style="text-align:center;font-family:'DM Mono',monospace;font-size:9px;
+color:#3a3a3a;letter-spacing:0.2em;padding:28px 0 12px;border-top:1px solid #2a2a2a;margin-top:32px">
+INDIA FASHION INTELLIGENCE · TOP COMBINATIONS ENGINE · GEO × CATEGORY × PRICE × COLOR
 </div>
 """, unsafe_allow_html=True)

@@ -403,9 +403,13 @@ def score_combination(city: str, subcat: str, price: str, color: str) -> dict:
     r2 = rng_for(city, subcat, price, color, "velocity")
     velocity = int(np.clip(r2.normal(8, 22), -35, 65))   # −35% to +65%
 
+    # Resolve hex string once here — stored as a proper #rrggbb column in the DataFrame
+    color_hex: str = ALL_COLORS.get(color, {}).get("hex", "#888888")
+
     return {
         "city": city, "subcat": subcat, "group": group,
         "price": price, "color": color,
+        "color_hex":   color_hex,          # ← hex string, always available downstream
         "geo_score":   geo_score,
         "cat_score":   cat_score,
         "price_score": price_score,
@@ -584,8 +588,8 @@ for idx, row in top_combos.iterrows():
     rk_color = RANK_COLORS[min(rank-1, 4)]
     rk_label = RANK_LABELS[min(rank-1, len(RANK_LABELS)-1)]
 
-    color_hex   = ALL_COLORS.get(row["color"], {}).get("hex","#888")
-    price_color = PRICE_BUCKETS.get(row["price"], {}).get("color","#888")
+    color_hex   = row["color_hex"]          # hex string already resolved in score_combination()
+    price_color = PRICE_BUCKETS.get(row["price"], {}).get("color","#888888")
     vel         = int(row["velocity"])
     vel_sign    = "+" if vel >= 0 else ""
     vel_cls     = "vel-up" if vel >= 0 else "vel-down"
@@ -789,8 +793,8 @@ with tab4:
 #  EXPORT
 # ══════════════════════════════════════════════════════════════════════════════
 with st.expander("📋 Export top combinations"):
-    export_df = top_combos[["city","group","subcat","price","color","score_norm","velocity","geo_score","cat_score","price_score","color_score"]].copy()
-    export_df.columns = ["City","Group","Sub-Category","Price","Color","Trend Score","Velocity %","Geo Score","Cat Score","Price Score","Color Score"]
+    export_df = top_combos[["city","group","subcat","price","color","color_hex","score_norm","velocity","geo_score","cat_score","price_score","color_score"]].copy()
+    export_df.columns = ["City","Group","Sub-Category","Price","Color","Color Hex","Trend Score","Velocity %","Geo Score","Cat Score","Price Score","Color Score"]
     st.dataframe(export_df.set_index("City"), use_container_width=True)
     st.download_button("⬇️ Download CSV", export_df.to_csv(index=False), "top_combinations.csv","text/csv")
 

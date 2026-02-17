@@ -1,59 +1,16 @@
-# 🧵 India Fashion Intelligence
-## Geography × Category × Price × Color Framework
+# 🔥 India Fashion — Top Trending Combinations
+## Geography × Category × Price × Color
 
-A 4-dimensional fashion trend analysis dashboard for India, powered by Google Trends.
-
----
-
-## The Framework
-
-| Dimension | What it answers | Controls |
-|---|---|---|
-| 📍 **Geography** | *Where* is demand highest? | Zone (N/S/E/W) or individual state |
-| 🏷️ **Category** | *What* is trending? | Ethnic / Western / Fusion / Streetwear / Occasion / Sustainable |
-| 💰 **Price** | *How much* are they willing to spend? | Budget / Mid / Premium / Luxury |
-| 🎨 **Color** | *What look* is winning? | Earth Tones / Pastels / Bolds / Monochromes / Jewel / Metallics |
-
-Every visualisation in the app lets you **intersect** these four lenses — e.g. "Premium ethnic wear, jewel tones, in South India".
+Scores every possible combination across 4 fashion dimensions and surfaces the top N trending signals across India's top 10 cities.
 
 ---
 
-## 📊 What's Inside
+## 🚀 Deploy to Streamlit Community Cloud (Free)
 
-### Dimension 1 — Geography
-- Horizontal bar chart: states ranked by total fashion interest, coloured by zone
-- Donut chart: interest share by geographic zone (North/South/East/West/Central)
-
-### Dimension 2 — Category
-- **Heatmap**: Category × Zone — which categories are hot in which regions
-- **Trend lines**: How each category's interest has moved over your chosen time period
-
-### Dimension 3 — Price Segment
-- **Grouped bar**: Price tier × Category — where price sensitivity intersects category
-- **Heatmap**: Price tier × Top states — which states prefer which price brackets
-
-### Dimension 4 — Color Palette
-- **Radar chart**: Color palette popularity across zones
-- **Trend lines**: Color palette trajectories over time
-- **Swatches panel**: Visual hex swatches + average scores per palette
-
-### Cross-Dimension
-- **Bubble scatter**: Category interest vs Price interest, coloured by zone, by state
-- **Auto insights**: 5 plain-language signals auto-generated from the data
-
----
-
-## 🚀 Deploy to Streamlit Community Cloud
-
-```bash
-# 1. Create a public GitHub repo with these files:
-#    fashion-gcpc/
-#    ├── app.py
-#    ├── requirements.txt
-#    └── README.md
-
-# 2. Go to share.streamlit.io
-# 3. New app → select repo → app.py → Deploy
+```
+1. Push these 3 files to a public GitHub repo
+2. Go to share.streamlit.io
+3. New app → select repo → app.py → Deploy
 ```
 
 ## 💻 Run Locally
@@ -65,54 +22,49 @@ streamlit run app.py
 
 ---
 
-## ⚙️ Configuration
+## ⚙️ How the Scoring Engine Works
 
-### Sidebar Controls
-- **Time Period** — 7 days to 12 months
-- **Demo Data toggle** — uses synthetic data (no API calls; useful during dev)
-- **Geography** — filter by Zone or individual State
-- **Category** — pick which fashion segments to compare
-- **Price Segments** — select which tiers to include
-- **Color Palettes** — select which color stories to track
+Every `City × Sub-category × Price × Color` combination is scored on 4 signals:
 
-### Adding Your Own Keywords
-Edit the dictionaries at the top of `app.py`:
+| Signal       | Weight | Logic |
+|---|---|---|
+| 📍 Geo Reach    | 20%    | City market size × demand profile fit |
+| 🏷️ Category Fit | 35%    | Sub-category affinity for the city |
+| 💰 Price Demand | 25%    | Price bracket fit (luxury vs budget bias) |
+| 🎨 Color Pull   | 20%    | City-specific colour preference weights |
 
-```python
-# Add a new category
-CATEGORIES["Athleisure"] = ["yoga pants India", "sports bra", "running shoes women", "gym wear"]
-
-# Add a new color trend
-COLOR_TRENDS["Neo-Mint"] = {
-    "keywords": ["mint green outfit", "neo mint fashion", "sage green kurta"],
-    "hex": ["#98ff98", "#3eb489", "#c1f0c1"]
-}
-
-# Add a new price tier
-PRICE_SEGMENTS["Ultra-Budget (< ₹200)"] = {
-    "suffix": "under 200", "color": "#6ee7b7", "range": "₹0–200"
-}
-```
+A **velocity score** (MoM %) is computed separately to show acceleration.  
+All scores are normalized 0–100 across the full combination space.
 
 ---
 
-## ⚠️ Rate Limiting Note
+## 🎛️ Sidebar Controls
 
-`pytrends` is unofficial — Google may rate-limit heavy usage. Built-in mitigations:
-- Results cached for 1 hour
-- 1.2s sleep between API batches
-- Auto-fallback to demo data if API fails
-- "Use demo data" toggle for development
-
-For production: use **GitHub Actions** to pre-fetch daily and store as CSV.
+| Control | Effect |
+|---|---|
+| Time Period | 7 days → 12 months |
+| Top N | Show top 3–10 combinations |
+| Cities | Filter to specific cities |
+| Category Groups | Filter which fashion segments to include |
+| Price Buckets | ₹0–1K through ₹5K+ |
+| Color | All 27 colors or filter by family |
+| Min Velocity | Hide declining combinations |
 
 ---
 
-## 📁 Structure
+## 📦 Files
 
 ```
-fashion-gcpc/
+fashion-top5/
 ├── app.py            ← Full Streamlit application
-├── requirements.txt  ← Dependencies
+├── requirements.txt  ← Python dependencies
 └── README.md         ← This file
 ```
+
+---
+
+## 🗒️ Notes
+
+- Color hex strings are resolved at **data creation time** inside `score_combination()` and stored as a `color_hex` column — no late dictionary lookups at render time.
+- Results are **cached for 30 minutes** (`@st.cache_data(ttl=1800)`).
+- The export CSV includes the `Color Hex` column for direct use in design tools.

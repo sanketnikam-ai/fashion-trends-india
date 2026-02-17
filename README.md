@@ -1,112 +1,118 @@
-# 👗 India Fashion Trend Tracker
+# 🧵 India Fashion Intelligence
+## Geography × Category × Price × Color Framework
 
-A Streamlit dashboard that pulls live Google Trends data to show which fashion trends are picking up across Indian states.
-
----
-
-## 🖥️ Live Demo
-
-Deploy free at [share.streamlit.io](https://share.streamlit.io) — no server needed.
+A 4-dimensional fashion trend analysis dashboard for India, powered by Google Trends.
 
 ---
 
-## 📦 Features
+## The Framework
 
-- **Interactive India map** — choropleth heatmap by state (search interest 0–100)
-- **Trend lines** — see how each keyword has grown over time
-- **Keyword × State heatmap** — compare multiple trends across regions at once
-- **Rising queries** — spot breakout search terms before they go mainstream
-- **State leaderboard** — which states drive the most fashion search volume
-- **5 keyword categories** — Traditional, Western, Emerging, Occasion, Accessories
-- **Demo mode** — works with synthetic data if the API is rate-limited
+| Dimension | What it answers | Controls |
+|---|---|---|
+| 📍 **Geography** | *Where* is demand highest? | Zone (N/S/E/W) or individual state |
+| 🏷️ **Category** | *What* is trending? | Ethnic / Western / Fusion / Streetwear / Occasion / Sustainable |
+| 💰 **Price** | *How much* are they willing to spend? | Budget / Mid / Premium / Luxury |
+| 🎨 **Color** | *What look* is winning? | Earth Tones / Pastels / Bolds / Monochromes / Jewel / Metallics |
+
+Every visualisation in the app lets you **intersect** these four lenses — e.g. "Premium ethnic wear, jewel tones, in South India".
 
 ---
 
-## 🚀 Deploy to Streamlit Community Cloud (Free)
+## 📊 What's Inside
 
-### Step 1 — Fork / push to GitHub
+### Dimension 1 — Geography
+- Horizontal bar chart: states ranked by total fashion interest, coloured by zone
+- Donut chart: interest share by geographic zone (North/South/East/West/Central)
+
+### Dimension 2 — Category
+- **Heatmap**: Category × Zone — which categories are hot in which regions
+- **Trend lines**: How each category's interest has moved over your chosen time period
+
+### Dimension 3 — Price Segment
+- **Grouped bar**: Price tier × Category — where price sensitivity intersects category
+- **Heatmap**: Price tier × Top states — which states prefer which price brackets
+
+### Dimension 4 — Color Palette
+- **Radar chart**: Color palette popularity across zones
+- **Trend lines**: Color palette trajectories over time
+- **Swatches panel**: Visual hex swatches + average scores per palette
+
+### Cross-Dimension
+- **Bubble scatter**: Category interest vs Price interest, coloured by zone, by state
+- **Auto insights**: 5 plain-language signals auto-generated from the data
+
+---
+
+## 🚀 Deploy to Streamlit Community Cloud
+
+```bash
+# 1. Create a public GitHub repo with these files:
+#    fashion-gcpc/
+#    ├── app.py
+#    ├── requirements.txt
+#    └── README.md
+
+# 2. Go to share.streamlit.io
+# 3. New app → select repo → app.py → Deploy
 ```
-your-github/
-└── fashion-trends-india/
-    ├── app.py
-    ├── requirements.txt
-    └── README.md
-```
-
-### Step 2 — Connect to Streamlit Cloud
-1. Go to [share.streamlit.io](https://share.streamlit.io)
-2. Sign in with GitHub
-3. Click **"New app"**
-4. Select your repo → branch: `main` → file: `app.py`
-5. Click **"Deploy"** → your app is live in ~60 seconds!
-
----
 
 ## 💻 Run Locally
 
 ```bash
-# Clone your repo
-git clone https://github.com/YOUR_USERNAME/fashion-trends-india
-cd fashion-trends-india
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run
 streamlit run app.py
 ```
 
-App opens at `http://localhost:8501`
-
 ---
 
-## 🎛️ How to Use
+## ⚙️ Configuration
 
-| Control | What it does |
-|---|---|
-| **Keyword Category** | Switch between Traditional, Western, Emerging trends etc. |
-| **Fashion Keywords** | Pick up to 5 keywords to compare |
-| **Time Period** | 7 days → 12 months |
-| **Use demo data** | Tick this if Google rate-limits your requests |
-| **Keyword to map** | Choose which keyword renders on the India state map |
-| **Rising Queries** | Explore breakout search terms for any selected keyword |
+### Sidebar Controls
+- **Time Period** — 7 days to 12 months
+- **Demo Data toggle** — uses synthetic data (no API calls; useful during dev)
+- **Geography** — filter by Zone or individual State
+- **Category** — pick which fashion segments to compare
+- **Price Segments** — select which tiers to include
+- **Color Palettes** — select which color stories to track
 
----
+### Adding Your Own Keywords
+Edit the dictionaries at the top of `app.py`:
 
-## ⚠️ Rate Limiting
+```python
+# Add a new category
+CATEGORIES["Athleisure"] = ["yoga pants India", "sports bra", "running shoes women", "gym wear"]
 
-`pytrends` is an **unofficial** Google Trends client. Google may rate-limit you if you make too many requests too fast. Tips:
+# Add a new color trend
+COLOR_TRENDS["Neo-Mint"] = {
+    "keywords": ["mint green outfit", "neo mint fashion", "sage green kurta"],
+    "hex": ["#98ff98", "#3eb489", "#c1f0c1"]
+}
 
-- The app **caches results for 1 hour** — refreshing won't re-hit the API
-- Use **"Use demo data"** checkbox during testing / development
-- For production, consider pre-fetching daily via **GitHub Actions** and storing results as a CSV
-
----
-
-## 📁 Project Structure
-
-```
-fashion-trends-india/
-├── app.py             ← Main Streamlit application
-├── requirements.txt   ← Python dependencies
-└── README.md          ← This file
+# Add a new price tier
+PRICE_SEGMENTS["Ultra-Budget (< ₹200)"] = {
+    "suffix": "under 200", "color": "#6ee7b7", "range": "₹0–200"
+}
 ```
 
 ---
 
-## 🛠️ Extend This
+## ⚠️ Rate Limiting Note
 
-Ideas for what to add next:
+`pytrends` is unofficial — Google may rate-limit heavy usage. Built-in mitigations:
+- Results cached for 1 hour
+- 1.2s sleep between API batches
+- Auto-fallback to demo data if API fails
+- "Use demo data" toggle for development
 
-- [ ] **GitHub Actions cron** — auto-fetch trends daily, cache as CSV
-- [ ] **City-level data** — change `resolution='CITY'` in pytrends call
-- [ ] **Brand tracking** — add Myntra, Meesho, Nykaa Fashion as keywords  
-- [ ] **Email alerts** — notify when a keyword hits breakout status
-- [ ] **Export to CSV** — add a download button for the data table
-- [ ] **SerpApi backend** — swap pytrends for a paid, more reliable API
+For production: use **GitHub Actions** to pre-fetch daily and store as CSV.
 
 ---
 
-## 📄 License
+## 📁 Structure
 
-MIT — free to use, modify, and deploy.
+```
+fashion-gcpc/
+├── app.py            ← Full Streamlit application
+├── requirements.txt  ← Dependencies
+└── README.md         ← This file
+```

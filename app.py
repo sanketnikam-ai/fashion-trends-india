@@ -431,6 +431,15 @@ def compute_all_combinations(cities, subcats, prices, colors):
     return df.sort_values("score_norm", ascending=False).reset_index(drop=True)
 
 
+def hex_to_rgba(hex_color: str, alpha: float = 0.1) -> str:
+    """Convert a #rrggbb hex string to an rgba() string Plotly accepts."""
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c*2 for c in h)
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
+
+
 def timeseries_for_combo(city, subcat, price, color, n=60):
     """Generate a trend sparkline for a specific combination."""
     r     = rng_for(city, subcat, price, color, "ts")
@@ -613,7 +622,7 @@ for idx, row in top_combos.iterrows():
         x=list(range(len(spark_vals))), y=spark_vals.tolist(),
         mode="lines", fill="tozeroy",
         line=dict(color=rk_color, width=2),
-        fillcolor=rk_color + "18",
+        fillcolor=hex_to_rgba(rk_color, 0.09),
         hoverinfo="skip"
     ))
     fig_spark.update_layout(
@@ -739,7 +748,7 @@ with tab2:
     city_cat = all_combos.groupby(["city","group"])["score_norm"].mean().reset_index()
     pivot_cc = city_cat.pivot(index="group", columns="city", values="score_norm").fillna(0)
     fig_cc = px.imshow(
-        pivot_cc, color_continuous_scale=[[0,"#141414"],[0.5,"#e8a02040"],[1,"#e8a020"]],
+        pivot_cc, color_continuous_scale=[[0,"#141414"],[0.5,"rgba(232,160,32,0.25)"],[1,"#e8a020"]],
         aspect="auto", text_auto=".0f", labels=dict(color="Avg Score")
     )
     fig_cc.update_traces(textfont=dict(family="DM Mono",size=9))
@@ -776,7 +785,7 @@ with tab4:
     pivot_col["_avg"] = pivot_col.mean(axis=1)
     pivot_col  = pivot_col.sort_values("_avg",ascending=False).drop(columns="_avg")
     fig_col = px.imshow(
-        pivot_col, color_continuous_scale=[[0,"#141414"],[0.5,"#6b3fa040"],[1,"#e879f9"]],
+        pivot_col, color_continuous_scale=[[0,"#141414"],[0.5,"rgba(107,63,160,0.25)"],[1,"#e879f9"]],
         aspect="auto", text_auto=".0f", labels=dict(color="Avg Score")
     )
     fig_col.update_traces(textfont=dict(family="DM Mono",size=8))
